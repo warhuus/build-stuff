@@ -31,3 +31,9 @@ Frozen files (change only via the lead): src/config/metrics.ts, metricsCodes.ts,
 - D22 (M9). The lead extends structure.test.ts with import-direction, apiName-literal, 40-line function and 150-line loader checks.
 - D23. `loadCard.ts` is built by Agent F (with hooks), since both share cache/concurrency.
 - D24. Progress: `onProgress({ loaded })` where `loaded` is cumulative rows across all fetches of one card load (loadCard wraps the callback and sums per fetch); `progress` on the result is the last value.
+
+## Lead notes during phase 2 (for phase 4 / REVIEW.md)
+- L1. Row-cap semantics differ: fake says capped when rows reach ROW_CAP (spec §9.0 pseudocode `rows.length >= ROW_CAP`); OSDK paging says capped only when rows were cut. Decision: follow the spec — OSDK adapter must also report capped when rows.length >= ROW_CAP. Fix in phase 4.
+- L2. compileWhere.ts has a local toDateOnly copy; dedupe to window.ts (rank 2, importable by source/osdk) in phase 4.
+- L3. Fixtures have 164 events, not ~300 (instructions §11 "about"); accepted for hand-checkability. Record in REVIEW.md.
+- L4. B's request for a VERDICT_DATE_PROPERTIES tuple: declined (V7 typed union already exists; fixture literal is test data, not delivered production logic... fixtures ARE delivered under source/fake — the literal "otifOtShipmentEndDate" is allowed there because it is typed as VerdictDateProperty, V7).
