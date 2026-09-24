@@ -47,9 +47,9 @@ const STAGE_1_0: FunnelStageRaw = unavailableStage("1.0", "no-source", ["no-sour
 
 /**
  * Section 1 breakdown (spec §9 1.1–1.4 and the note after 1.4): non-additive for every dim (Appendix A
- * registry), `overlapRatio` on the first applicable stage; groups chosen on the
- * first applicable stage (queueFilter 1.1; alertType and escalated 1.2; actionType 1.3; writebackType
- * 1.4); every group a full series with 1.0 (spec §9 1.0) and the stages the dim does not apply to `not-applicable`.
+ * registry); groups chosen and `overlapRatio` computed on the first applicable stage (queueFilter 1.1;
+ * alertType and escalated 1.2; actionType 1.3; writebackType 1.4); every group a full series with 1.0
+ * (spec §9 1.0) and the stages the dim does not apply to `not-applicable`.
  */
 function userBreakdown(
   raw: UserFunnelRaw,
