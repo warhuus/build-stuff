@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +18,7 @@ function walk(dir: string): string[] {
 }
 
 const files = DELIVERED_ROOTS.flatMap((r) => walk(join(SRC, r)))
-  .filter((f) => /\.(ts|tsx)$/.test(f))
+  .filter((f) => /\.(ts|tsx)$/.test(f) && !/(structure|layering)\.test\.ts$/.test(f))
   .map((f) => ({ rel: relative(SRC, f), text: readFileSync(f, "utf8") }));
 const productionFiles = files.filter((f) => !f.rel.includes("__tests__"));
 

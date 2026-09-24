@@ -118,18 +118,13 @@ export interface OtifOutcomeRaw extends RawBase {
   readonly verdicts: readonly VerdictRow[];
 }
 
-/** 4.2 not-worked fetch (7/14 days only): closed events of alerts not open now, plus their opened events. */
-export interface NotWorkedRaw {
-  readonly closedEvents: readonly AlertEventRow[];
-  readonly openedEvents: readonly AlertEventRow[];
-}
 /**
  * 4.2 / 4.3 / 4.4 raw (spec §9 4.2–4.4): L2 facts (4.3: selected window; 4.2/4.4: "now"), the not-worked
  * fetch (4.2 at 7/14 only, else null) and the population's items by id (item dims only, else null).
  */
 export interface DurationRaw extends RawBase {
   readonly facts: readonly AlertLifecycleRow[];
-  readonly notWorked: NotWorkedRaw | null;
+  readonly notWorked: readonly AlertLifecycleRow[] | null;
   readonly items: readonly ItemRow[] | null;
 }
 

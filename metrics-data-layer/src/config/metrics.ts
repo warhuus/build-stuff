@@ -15,6 +15,9 @@ import {
 export * from "./metricsCodes";
 export * from "./metricsText";
 
+/** Error message of a breakdown not allowed for (card, view). Instructions §7. */
+export const BREAKDOWN_NOT_ALLOWED = "breakdown-not-allowed";
+
 /** Placeholder for values set at integration (instructions §13 rule 3). */
 export const PLACEHOLDER = "<to be set at integration>";
 

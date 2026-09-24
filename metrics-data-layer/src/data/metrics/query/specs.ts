@@ -26,7 +26,7 @@ export type EventPredicate = "viewed" | "action" | "writeback" | "human" | "open
  * (all events); a window with `start: null` ("now") = `eventTimestamp <= end` only (spec §9.0 `tsIn`).
  */
 export interface EventFilter {
-  readonly predicates: readonly EventPredicate[];
+  readonly predicates: readonly [EventPredicate, ...EventPredicate[]];
   readonly window: Window | null;
 }
 

@@ -4,6 +4,7 @@
  * Output types: `outputTypes.ts`; raw fetch rows: `rowTypes.ts`; per-card raw loader data: `rawTypes.ts`.
  * All re-exported here; the barrel imports from this file only.
  */
+import type { MetricsConfig } from "../../config/metrics";
 import type {
   BLOCKED_REASONS,
   BREAKDOWN_DIMENSIONS,
@@ -175,4 +176,4 @@ export interface DeriveOutput<T> {
   readonly caveats: readonly Caveat[];
 }
 /** A card's pure derive: raw → card data, applying unit and threshold. Appendix A O3. */
-export type Derive<R, T> = (raw: R, selection: Selection) => DeriveOutput<T>;
+export type Derive<R, T> = (raw: R, selection: Selection, config?: MetricsConfig) => DeriveOutput<T>;
