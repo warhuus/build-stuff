@@ -65,6 +65,14 @@ const PK: Readonly<Record<string, string>> = {
   SalesOrderOtifEvaluation: "salesOrderId", OtifOrderVerdict: "otifOrderId", AppUsageEvent: "eventId", AlertType: "primaryKey_",
 };
 
+/** Links per source object type: [link name, one-to-many]. Spec §3. */
+const LINKS: Readonly<Record<string, readonly (readonly [string, boolean])[]>> = {
+  SalesOrders: [["alertHistory", true], ["orderFulfillmentAlerts", true], ["otifEvaluation", false]],
+  AlertHistory: [["salesOrder_1", false], ["alert", false]],
+  AlertOrderFulfillment: [["sourceSalesOrder", false], ["historyEvents", true], ["alertType", false]],
+  SalesOrderOtifEvaluation: [["salesOrder", false]],
+};
+
 function fullMetadata(apiName: string): unknown {
   const props = PROPS[apiName] ?? {};
   const properties = Object.fromEntries(
@@ -76,7 +84,11 @@ function fullMetadata(apiName: string): unknown {
       visibility: "NORMAL", displayName: apiName, pluralDisplayName: apiName,
       icon: { type: "blueprint", color: "blue", name: "x" }, properties,
     },
-    linkTypes: [], implementsInterfaces: [], implementsInterfaces2: {}, sharedPropertyTypeMapping: {},
+    linkTypes: (LINKS[apiName] ?? []).map(([link, many]) => ({
+      apiName: link, objectTypeApiName: LINK_TARGET[link], cardinality: many ? "MANY" : "ONE", status: "ACTIVE",
+      displayName: link, linkTypeRid: `ri.link.${link}`,
+    })),
+    implementsInterfaces: [], implementsInterfaces2: {}, sharedPropertyTypeMapping: {},
   };
 }
 

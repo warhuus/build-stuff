@@ -11,7 +11,7 @@ import type { Paged, Progress } from "../../types";
 export interface PagingCtx {
   readonly signal: AbortSignal;
   readonly onProgress?: (p: Progress) => void;
-  readonly config: { readonly ROW_CAP: number; readonly INNER_CONCURRENCY: number };
+  readonly config: { readonly ROW_CAP: number };
 }
 
 /** One page request: `token` undefined for the first page. The caller closes over a literal `$select`. */
@@ -117,7 +117,7 @@ export function mergePaged<T>(parts: readonly Paged<T>[], cap: number): Paged<T>
 
 /**
  * Pages a set and maps each OSDK row to a port row (dropping unmappable rows, decision D15).
- * `cap` defaults to `config.ROW_CAP`.
+ * The cap is `config.ROW_CAP`.
  */
 export async function fetchMapped<T, R>(
   page: PageRequest<T>,
