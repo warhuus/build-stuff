@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 import {
   appUsageWhere,
@@ -12,7 +13,7 @@ import {
   verdictDateIn,
   verdictGate,
 } from "../../../source/osdk/compileWhere";
-import { PLACEHOLDER } from "../../../../../config/metrics";
+import { PLACEHOLDER, type MetricsConfig } from "../../../../../config/metrics";
 import { NO_FILTERS, SOME_FILTERS, TEST_CONFIG, W7, WNOW } from "./osdkTestUtils";
 
 const PRED = buildPredicates(TEST_CONFIG);
@@ -127,7 +128,7 @@ describe("open-alert, risk, verdict and app-usage clauses", () => {
     });
   });
   it("placeholders throw instead of compiling", () => {
-    const placeholder = { ...TEST_CONFIG, VERDICT_DATE_PROPERTY: PLACEHOLDER, ALERT_APP_ID: PLACEHOLDER };
+    const placeholder: MetricsConfig = { ...TEST_CONFIG, VERDICT_DATE_PROPERTY: PLACEHOLDER, ALERT_APP_ID: PLACEHOLDER };
     expect(() => verdictDateIn(W7, placeholder)).toThrow(/VERDICT_DATE_PROPERTY/);
     expect(() => appUsageWhere(W7, placeholder)).toThrow(/ALERT_APP_ID/);
   });

@@ -87,6 +87,11 @@ function isWireBody(v: unknown): v is WireBody {
   return typeof v === "object" && v !== null && "objectSet" in v;
 }
 
+/** True when the aggregate request has a group-by (grouped results are arrays). */
+export function isGrouped(body: WireBody): boolean {
+  return Array.isArray(body.groupBy) && body.groupBy.length > 0;
+}
+
 /** A recording client plus its request log. `inFlight`/`maxInFlight` count loadObjects requests. */
 export interface RecordingClient {
   readonly client: Client;
@@ -99,7 +104,10 @@ export interface RecordingClient {
 export function createRecordingClient(): RecordingClient {
   const requests: Recorded[] = [];
   const stats = { inFlight: 0, maxInFlight: 0 };
-  const handlers: Handlers = { aggregate: () => ({ data: [] }), load: () => ({ data: [] }) };
+  const handlers: Handlers = {
+    aggregate: (body) => ({ data: isGrouped(body) ? [] : [{ group: {}, metrics: [] }] }),
+    load: () => ({ data: [] }),
+  };
   const fetchFn = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const meta = /objectTypes\/([^/]+)\/fullMetadata/.exec(url);
