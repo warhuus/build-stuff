@@ -15,6 +15,7 @@ import type {
   SalesOrders,
 } from "@app/sdk";
 import type { GroupCount, GroupCountValue, MetricsConfig, OtifMode, RangeCount } from "../../types";
+import { escalatedLabel } from "../../compute/dimValues";
 import type { AppUsageGroupField, EventGroupField, ItemGroupField, OpenAlertGroupField } from "../../query/specs";
 
 type Num = number | null | undefined;
@@ -23,13 +24,29 @@ const ACTOR_SEL = { "eventActor:exactDistinct": "unordered" } as const;
 const ALERT_SEL = { "riskAlertId:exactDistinct": "unordered" } as const;
 const COUNT_SEL = { $count: "unordered" } as const;
 
-const n = (v: Num): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+/**
+ * An aggregate number read defensively (S7).
+ * @param v the value from the aggregate result (may be missing).
+ * @returns `v` when it is a finite number; 0 for null, undefined, NaN or ±Infinity.
+ */
+export const finiteOrZero = (v: Num): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+
+/**
+ * The rows of an aggregate result read defensively (S7), keeping the precise row type (TYP-04: a bare
+ * `Array.isArray` ternary would widen `readonly R[]` to an untyped array).
+ * @param rows the aggregate result.
+ * @returns `rows` when it is an array; otherwise an empty list.
+ */
+export function aggregateRows<R>(rows: readonly R[]): readonly R[] {
+  const list: readonly R[] = Array.isArray(rows) ? rows : [];
+  return list;
+}
 
 /** Group rows → `GroupCount[]`; null/undefined groups dropped; group values as strings. */
 export function toGroupCounts<R>(rows: readonly R[], groupOf: (r: R) => unknown, countOf: (r: R) => Num): GroupCount[] {
-  return (Array.isArray(rows) ? rows : []).flatMap((r) => {
+  return aggregateRows(rows).flatMap((r) => {
     const g = groupOf(r);
-    return g === null || g === undefined ? [] : [{ group: String(g), count: n(countOf(r)) }];
+    return g === null || g === undefined ? [] : [{ group: String(g), count: finiteOrZero(countOf(r)) }];
   });
 }
 
@@ -37,9 +54,9 @@ function toGroupCountValues<R extends { readonly $count?: Num; readonly valueUsd
   rows: readonly R[],
   groupOf: (r: R) => unknown,
 ): GroupCountValue[] {
-  return (Array.isArray(rows) ? rows : []).flatMap((r) => {
+  return aggregateRows(rows).flatMap((r) => {
     const g = groupOf(r);
-    return g === null || g === undefined ? [] : [{ group: String(g), count: n(r.$count), valueUsd: n(r.valueUsd?.sum) }];
+    return g === null || g === undefined ? [] : [{ group: String(g), count: finiteOrZero(r.$count), valueUsd: finiteOrZero(r.valueUsd?.sum) }];
   });
 }
 
@@ -148,16 +165,21 @@ export async function openAlertsGrouped(
     }
     case "escalated": {
       const r = await set.aggregate({ $select: COUNT_SEL, $groupBy: { escalated: { $exactWithLimit: max } } });
-      return toGroupCounts(r, (x) => escalatedLabel(x.$group.escalated, config), count);
+      return toGroupCounts(r, (x) => escalatedGroupLabel(x.$group.escalated, config), count);
     }
   }
 }
 
-/** Label of a boolean group value, safe for `true` and `"true"` (F6); null stays null (dropped). */
-export function escalatedLabel(v: unknown, config: MetricsConfig): string | null {
+/**
+ * Label of a boolean `escalated` group value (spec §5 B3), safe for `true` and `"true"` (F6): normalises the
+ * wire value, then applies the one label rule `compute/dimValues.escalatedLabel`.
+ * @param v the `$group.escalated` value as returned by the server.
+ * @param config supplies `ESCALATED_GROUP_LABELS`.
+ * @returns the configured true/false label; null or undefined → null (the group is dropped).
+ */
+export function escalatedGroupLabel(v: unknown, config: MetricsConfig): string | null {
   if (v === null || v === undefined) return null;
-  const labels = config.ESCALATED_GROUP_LABELS;
-  return String(v) === "true" ? labels.true : labels.false;
+  return escalatedLabel(String(v) === "true", config);
 }
 
 /** Distinct app users per queue-filter persona (spec §9 1.1; AppUsageEvent.persona is exact). */
@@ -199,9 +221,9 @@ export async function riskByRanges(
   if (ranges.length === 0) return [];
   const mutable = ranges.map(([lo, hi]): [number, number] => [lo, hi]);
   const r = await set.aggregate({ $select: COUNT_SEL, $groupBy: { otifScore: { $ranges: mutable } } });
-  return (Array.isArray(r) ? r : []).flatMap((x) => {
+  return aggregateRows(r).flatMap((x) => {
     const start: unknown = x.$group.otifScore?.startValue;
-    const count = n(x.$count);
+    const count = finiteOrZero(x.$count);
     return typeof start === "number" && count > 0 ? [{ startValue: start, count }] : [];
   });
 }

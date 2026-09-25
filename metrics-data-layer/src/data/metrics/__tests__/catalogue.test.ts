@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { CARD_IDS } from "../../../config/metrics";
-import { CARD_IMPL, CARDS, deriveStubRows, funnelStageCaveats, loadStub, noStageCaveats } from "../catalogue";
+import { CARD_IMPL, CARDS, funnelStageCaveats, noStageCaveats } from "../catalogue";
+import { deriveStubRows } from "../compute/deriveStub";
+import { loadStub } from "../loaders/blocked";
 import { deriveAgeingBacklog } from "../compute/deriveAgeingBacklog";
 import { deriveItemFunnel } from "../compute/deriveItemFunnel";
 import { deriveUserFunnel } from "../compute/deriveUserFunnel";

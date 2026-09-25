@@ -27,7 +27,7 @@ function rankOf(rel: string): number {
   if (rel.startsWith("config")) return 0;
   if (/^(types|outputTypes|rowTypes|rawTypes)\.ts$/.test(p)) return 1;
   if (/^(compute|query)\//.test(p) || /^(window|selection|breakdowns)\.ts$/.test(p)) return 2;
-  if (p === "source/MetricsSource.ts") return 3;
+  if (p === "source/MetricsSource.ts" || p === "source/batching.ts") return 3;
   if (/^source\/(osdk|fake)\//.test(p)) return 3.5;
   if (p.startsWith("shared/")) return 4;
   if (p.startsWith("loaders/")) return 5;

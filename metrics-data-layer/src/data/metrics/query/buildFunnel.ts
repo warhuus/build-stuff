@@ -11,7 +11,7 @@ import {
   itemsWithOpenAlertWhere,
   openAlerts,
   openAlertsOfEvents,
-  openItemsInWindow,
+  itemsOpenInWindow,
   withItemFilters,
 } from "./build";
 import type { EventSet, ItemSet, OpenAlertCondition, OpenAlertSet } from "./specs";
@@ -51,7 +51,7 @@ export const alertedItems = (w: Window): ItemSet => {
  * Filters enter once, through so20; the event legs are unfiltered AlertHistory pivots.
  */
 export const itemFunnelSets = (w: Window, f: ItemFilters): ItemFunnelSets => {
-  const so20 = withItemFilters(openItemsInWindow(w), f);
+  const so20 = withItemFilters(itemsOpenInWindow(w), f);
   const so21 = intersect(so20, alertedItems(w));
   const so22 = intersect(so21, itemsWithEvent(["viewed"], w));
   const acted = itemsWithEvent(["action"], w);

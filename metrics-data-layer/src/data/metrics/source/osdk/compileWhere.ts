@@ -12,15 +12,13 @@ import type {
   SalesOrderOtifEvaluation,
   SalesOrders,
 } from "@app/sdk";
-import { SCORED_BUCKETS } from "../../../../config/metrics";
+import { PLACEHOLDER, SCORED_BUCKETS } from "../../../../config/metrics";
 import type { ItemFilters, MetricsConfig, OtifMode, Window } from "../../types";
 import type { EventFilter, EventPredicate, OpenAlertCondition, RiskCondition } from "../../query/specs";
+import { toDateOnly } from "../../window";
 
 /** The named AlertHistory predicates (spec §4, §9.0 `PRED`). */
 export type PredicateClauses = Readonly<Record<EventPredicate, WhereClause<AlertHistory>>>;
-
-/** Calendar date (`YYYY-MM-DD`, UTC) of an ISO-8601 UTC timestamp, for `datetime` (date) properties. Spec §8, F9. */
-export const toDateOnly = (iso: string): string => iso.slice(0, 10);
 
 /**
  * `eventTimestamp` in the window: `$and` of `$gte start` and `$lte end` (full ISO strings); under `"now"`
@@ -107,10 +105,12 @@ export function openAlertWhere(c: OpenAlertCondition): WhereClause<AlertOrderFul
 }
 
 /**
- * Risk condition (spec §9 3.1): notDelayed = `$not otifStatus = Delayed`; delayed; unscored = not delayed AND
- * score `$isNull`; scored bucket i = not delayed AND lo ≤ score < hi from `config.RISK_RANGES[i]`.
+ * Compiles a risk condition to a where clause (spec §9 3.1): notDelayed = `$not otifStatus = Delayed`;
+ * delayed; unscored = not delayed AND score `$isNull`; scored bucket i = not delayed AND lo ≤ score < hi from
+ * `config.RISK_RANGES[i]`. (Not the spec builder `query/buildRisk.riskWhere`, which builds a `RiskSet`.)
+ * Throws when `RISK_RANGES` has no range for a scored bucket.
  */
-export function riskWhere(c: RiskCondition, config: MetricsConfig): WhereClause<SalesOrderOtifEvaluation> {
+export function compileRiskCondition(c: RiskCondition, config: MetricsConfig): WhereClause<SalesOrderOtifEvaluation> {
   const delayed: WhereClause<SalesOrderOtifEvaluation> = { otifStatus: { $eq: config.OTIF_STATUS_DELAYED } };
   const notDelayed: WhereClause<SalesOrderOtifEvaluation> = { $not: delayed };
   if (c.kind === "notDelayed") return notDelayed;
@@ -158,7 +158,7 @@ export function verdictDateIn(w: Window, config: MetricsConfig): WhereClause<Oti
       return s !== null
         ? { $and: [{ otifFirstInitialDeliveryDateTarget: { $gte: s } }, { otifFirstInitialDeliveryDateTarget: { $lte: e } }] }
         : { otifFirstInitialDeliveryDateTarget: { $lte: e } };
-    default:
+    case PLACEHOLDER:
       throw new Error("VERDICT_DATE_PROPERTY is not set (needs-integration-value)");
   }
 }

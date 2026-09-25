@@ -4,24 +4,15 @@
  * `window.key | filtersKey(filters)` (D7); never acquires the app semaphore (Appendix A X3).
  */
 import { alertFactsForIds } from "../compute/alertLifecycle";
+import { sortedDistinct } from "../compute/stats";
 import { closedNotOpenNow, openedEventsOfItemsOf } from "../query/build";
-import { filtersKey } from "../selection";
 import type { LoaderDeps } from "../source/MetricsSource";
 import type { AlertLifecycleRow, ItemFilters, Paged, Window } from "../types";
-import { createSharedMemo } from "./memo";
-import { sortedDistinct, sourceCtxOf } from "./sourceCtx";
+import { createSharedMemo, memoKey } from "./memo";
+import { sourceCtxOf } from "./sourceCtx";
 
 const memo = createSharedMemo<string, Paged<AlertLifecycleRow>>();
 const NOT_OPEN_NOW: ReadonlySet<string> = new Set<string>();
-
-/**
- * Not-worked memo key.
- * @param window resolved window (only its key is used).
- * @param filters item filters.
- * @returns `NW|<window.key>|<filtersKey>`.
- */
-export const notWorkedAlertsKey = (window: Window, filters: ItemFilters): string =>
-  `NW|${window.key}|${filtersKey(filters)}`;
 
 /** The two 4.2 fetches and the pure mapping, run once per key inside the memo. */
 async function fetchNotWorked(
@@ -37,8 +28,7 @@ async function fetchNotWorked(
     deps.source.fetchEvents(openedEventsOfItemsOf(finalSet), ctx),
   ]);
   const ids = sortedDistinct(closed.rows.map((e) => e.riskAlertId));
-  const keep = new Set(ids);
-  const events = [...closed.rows, ...opened.rows.filter((e) => keep.has(e.riskAlertId))];
+  const events = [...closed.rows, ...opened.rows];
   return { rows: alertFactsForIds(ids, events, NOT_OPEN_NOW, deps.config), capped: closed.capped || opened.capped };
 }
 
@@ -64,7 +54,7 @@ export function loadNotWorkedAlerts(
   deps: LoaderDeps,
 ): Promise<Paged<AlertLifecycleRow>> {
   return memo.get(
-    notWorkedAlertsKey(window, filters),
+    memoKey(window, filters),
     (signal) => fetchNotWorked(window, filters, deps, signal),
     deps.signal,
   );

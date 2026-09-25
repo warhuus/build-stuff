@@ -1,34 +1,15 @@
 /**
  * Error normalisation (shared layer). Instructions §4 `shared/errors.ts`, §7 ("never throws: errors become
- * `status: "error"` with a message"). Abort errors use the platform `DOMException` name `AbortError`.
+ * `status: "error"` with a message"). Abort errors use the platform `DOMException` name `AbortError` and the
+ * one message of `compute/abort.ts`.
  */
 import type { MetricResult, Window } from "../types";
 
 /**
- * Whether a thrown value is an abort (a `DOMException`/`Error` or any object whose `name` is `AbortError`).
- * @param e any thrown value.
- * @returns true for aborts; false otherwise (including null/undefined).
+ * The abort helpers (`abortError`, `isAbortError`, `throwIfAborted`), defined once in `compute/abort.ts` so
+ * the source adapters (which may not import `shared/`) raise the same error. Re-exported for shared callers.
  */
-export function isAbortError(e: unknown): boolean {
-  return typeof e === "object" && e !== null && "name" in e && e.name === "AbortError";
-}
-
-/**
- * A fresh abort error, as rejected by the port and the shared helpers when a signal aborts.
- * @returns a `DOMException` named `AbortError` (empty message; `errorMessage` then reports the name).
- */
-export function abortError(): DOMException {
-  return new DOMException(undefined, "AbortError");
-}
-
-/**
- * Rejects with `abortError()` when the signal has aborted (call between pages, batches or waits).
- * @param signal optional signal; absent = never aborted.
- * @returns nothing; throws the abort error when aborted.
- */
-export function throwIfAborted(signal: AbortSignal | undefined): void {
-  if (signal?.aborted) throw abortError();
-}
+export { abortError, isAbortError, throwIfAborted } from "../compute/abort";
 
 /**
  * A human-readable message for any thrown value.

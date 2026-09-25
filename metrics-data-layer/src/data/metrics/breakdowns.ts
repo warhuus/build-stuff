@@ -3,8 +3,9 @@
  * (binding; supersedes the Excel and spec §5 where they differ) plus spec §5 B1 and B10.
  * The dim → property apiName mapping lives only in `source/osdk` (lead decision D10).
  */
-import { ITEM_DIMS } from "../../config/metrics";
-import type { BreakdownDimension, CardId, ItemDim, ItemFunnelView, StageId } from "./types";
+import { FUNNEL_STAGES, ITEM_DIMS } from "../../config/metrics";
+import type { EventGroupField, OpenAlertFilterField } from "./query/specs";
+import type { BreakdownDimension, CardId, ItemDim, ItemFunnelView, StageId, UserStageId } from "./types";
 
 /** One allowed dimension of a (card, view): the funnel stages it applies to and its additive flag. */
 export interface BreakdownRule {
@@ -18,11 +19,26 @@ export interface BreakdownRule {
 /** Rules per itemFunnel view; every other card has the same list for both views (view is ignored). */
 export type BreakdownRegistry = Readonly<Record<CardId, Readonly<Record<ItemFunnelView, readonly BreakdownRule[]>>>>;
 
-const U_ALL: readonly StageId[] = ["1.1", "1.2", "1.3", "1.4"];
-const U_ALERT: readonly StageId[] = ["1.2", "1.3", "1.4"];
-const I_ALL: readonly StageId[] = ["2.0", "2.1", "2.2", "2.3", "2.4"];
-const I_ALERT: readonly StageId[] = ["2.1", "2.2", "2.3", "2.4"];
-const ALERT_ATTRS = ["alertType", "routingPersona", "priority"] as const;
+/** Whether a stage id is a queried section-1 stage (1.1–1.4; 1.0 has no source, spec §9 1.0). */
+export function isQueriedUserStage(id: StageId): id is UserStageId {
+  return id === "1.1" || id === "1.2" || id === "1.3" || id === "1.4";
+}
+/** Section 1 stages that are queried, in `FUNNEL_STAGES.user` order: 1.1–1.4. */
+export const QUERIED_USER_STAGES: readonly UserStageId[] = FUNNEL_STAGES.user.filter(isQueriedUserStage);
+/** Section 1 stages built on AlertHistory events (spec §9 1.2–1.4). */
+const U_ALERT: readonly StageId[] = FUNNEL_STAGES.user.slice(2);
+const I_ALL: readonly StageId[] = FUNNEL_STAGES.item;
+/** Section 2 stages of the alert view and of alert dims at item grain (2.0 excluded, Appendix A F3): 2.1–2.4. */
+export const ALERT_VIEW_STAGES: readonly StageId[] = FUNNEL_STAGES.item.slice(1);
+const I_ALERT = ALERT_VIEW_STAGES;
+
+/** Alert attributes present on AlertHistory pipeline events, AlertOrderFulfillment and L2 `attrs` (spec §5 R2, W6). */
+export const ALERT_ATTR_DIMS = ["alertType", "routingPersona", "priority"] as const;
+/** One of `ALERT_ATTR_DIMS`. */
+export type AlertAttrDim = (typeof ALERT_ATTR_DIMS)[number];
+const ALERT_ATTRS = ALERT_ATTR_DIMS;
+/** Alert dimensions (spec §5 R2): alert attributes, the escalated flag and the event-type dims. */
+export const ALERT_DIMS = [...ALERT_ATTR_DIMS, "escalated", "actionType", "writebackType"] as const;
 
 const rule = (dim: BreakdownDimension, stages: readonly StageId[], additive: boolean): BreakdownRule => ({
   dim,
@@ -38,7 +54,7 @@ const bothViews = (rules: readonly BreakdownRule[]): Readonly<Record<ItemFunnelV
 
 /** userFunnel: every dim non-additive (Appendix A registry, row 1). */
 const USER_FUNNEL: readonly BreakdownRule[] = [
-  rule("queueFilter", U_ALL, false),
+  rule("queueFilter", QUERIED_USER_STAGES, false),
   rule("alertType", U_ALERT, false),
   rule("escalated", U_ALERT, false),
   rule("actionType", ["1.3"], false),
@@ -154,11 +170,68 @@ export function isItemDim(dim: BreakdownDimension): dim is ItemDim {
 }
 
 /**
- * Whether a dim is an alert dimension (alert attribute or alert-event type; spec §5 R2): every dim that is
- * neither an item dim nor `queueFilter` (the app-usage / event persona dim of section 1).
+ * Whether a dim is an alert dimension (spec §5 R2), defined positively from `ALERT_DIMS` so a new dim is
+ * never an alert dim by default (spec §12.2 S1).
  * @param dim dimension.
- * @returns true for routingPersona, priority, escalated, alertType, actionType, writebackType.
+ * @returns true for alertType, routingPersona, priority, escalated, actionType, writebackType.
  */
 export function isAlertDim(dim: BreakdownDimension): boolean {
-  return !isItemDim(dim) && dim !== "queueFilter";
+  return ALERT_DIMS.some((d) => d === dim);
+}
+
+/**
+ * Whether a dim is an alert attribute (alertType, routingPersona, priority): grouped by the pipeline event on
+ * AlertHistory, by AlertOrderFulfillment for open alerts and by L2 `attrs` (spec §5 R2, §9 2.1, 4.2–4.6).
+ * @param dim dimension or null.
+ * @returns true for the three attributes (narrows to `AlertAttrDim`); false for null.
+ */
+export function isAlertAttrDim(dim: BreakdownDimension | null): dim is AlertAttrDim {
+  return ALERT_ATTR_DIMS.some((d) => d === dim);
+}
+
+/**
+ * Whether a dim is an exact-matchable AlertOrderFulfillment filter field (spec §9.0 `aofWhere`): the item-view
+ * alert dims at item grain (spec §9 2.1 `perGroup`).
+ * @param dim dimension.
+ * @returns true for routingPersona, priority, escalated (narrows to `OpenAlertFilterField`).
+ */
+export function isOpenAlertFilterDim(dim: BreakdownDimension): dim is OpenAlertFilterField {
+  return dim === "routingPersona" || dim === "priority" || dim === "escalated";
+}
+
+/**
+ * The AlertHistory group-by field of a dim (spec §9.0 `ahGroupBy`): queueFilter / routingPersona → persona,
+ * alertType → riskType, priority → priorityAtEvent, actionType / writebackType → eventType. Exhaustive over
+ * `BreakdownDimension`, so a new dim must be placed here (spec §12.2 S1).
+ * @param dim dimension.
+ * @returns the field; null for item dims and escalated (not an AlertHistory property).
+ */
+export function eventGroupFieldOf(dim: BreakdownDimension): EventGroupField | null {
+  switch (dim) {
+    case "queueFilter":
+    case "routingPersona":
+    case "alertType":
+    case "priority":
+    case "actionType":
+    case "writebackType":
+      return dim;
+    case "escalated":
+    case "businessLine":
+    case "productLine":
+    case "region":
+    case "plant":
+      return null;
+    default:
+      return unhandledDimension(dim);
+  }
+}
+
+/**
+ * The `never` arm of an exhaustive `BreakdownDimension` switch (instructions §7: never silently compute
+ * something else; spec §12.2 S1): a new dim that a dispatch forgets fails to compile there.
+ * @param dim a value TypeScript proved impossible.
+ * @returns never; throws `TypeError` if reached at run time with an unknown value.
+ */
+export function unhandledDimension(dim: never): never {
+  throw new TypeError(`Unhandled breakdown dimension: ${String(dim)}`);
 }

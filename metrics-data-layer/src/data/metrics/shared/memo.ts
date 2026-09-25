@@ -5,6 +5,8 @@
  * until `clearMetricsCache()` (the memo registers its `clear` with `cache.registerMemo`). Shared loaders never
  * acquire the app semaphore (Appendix A X3).
  */
+import { filtersKey } from "../selection";
+import type { ItemFilters, Window } from "../types";
 import { registerMemo } from "./cache";
 import { abortError } from "./errors";
 import { type InFlight, startInFlight } from "./inflight";
@@ -13,7 +15,7 @@ import { type InFlight, startInFlight } from "./inflight";
 export interface SharedMemo<K extends string, V> {
   /**
    * The memoised value for `key`, joining the in-flight run or starting `run`.
-   * @param key memo key (e.g. `L2|<window.key>|<filtersKey>`).
+   * @param key memo key (`memoKey(window, filters)`).
    * @param run the fetch; receives the shared internal signal.
    * @param signal this caller's signal; its abort rejects this caller only (with an abort error).
    * @returns the value; rejects with the run's error (entry evicted) or an abort error.
@@ -25,6 +27,18 @@ export interface SharedMemo<K extends string, V> {
   clear(): void;
   /** @returns the number of keys held (resolved plus in flight). */
   size(): number;
+}
+
+/**
+ * The one shared-loader memo key (spec §11: L1/L2/not-worked by `window.key | hash(filters)`, L3 by filters
+ * only). Each shared loader owns its memo, so the key carries no loader prefix.
+ * @param window resolved window (only its key is used); null for the window-free L3 memos.
+ * @param filters item filters, as the canonical `selection.filtersKey`.
+ * @returns `<window.key>|<filtersKey>`, or `<filtersKey>` when `window` is null.
+ */
+export function memoKey(window: Window | null, filters: ItemFilters): string {
+  const f = filtersKey(filters);
+  return window === null ? f : `${window.key}|${f}`;
 }
 
 type Slot<V> = { readonly done: true; readonly value: V } | { readonly done: false; readonly run: InFlight<V> };

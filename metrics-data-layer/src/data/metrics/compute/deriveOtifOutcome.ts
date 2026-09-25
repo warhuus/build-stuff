@@ -6,17 +6,19 @@ import { METRICS_CONFIG } from "../../../config/metrics";
 import type { Derive, OtifOutcomeRaw, OutcomeHeadline } from "../types";
 import { hasFilters } from "../selection";
 import { mergeCaveats } from "./caveats";
-import { caveatsIf, caveatsIfNow } from "./deriveCommon";
+import { caveatsIf, caveatsIfNow, truncationCaveats } from "./deriveCommon";
 import { outcomeHeadline } from "./otifOutcome";
 
 /**
- * 4.1 derive: `total` = `outcomeHeadline` of the raw (gate and window applied client-side), breakdown null.
+ * 4.1 derive (spec §9 4.1 step 4): `total` = `outcomeHeadline` of the raw (gate and window applied
+ * client-side), breakdown null.
  * Caveats: `unstratified`, `not-worked-includes-unalerted`, `gate-differs` (always, first draft);
  * `filters-not-applied` when any item filter is set (R3: 4.1 ignores item filters); `now-all-time` under
- * "now". A clamped not-worked count adds no caveat (no code exists for it; instructions §8 item 13).
+ * "now"; `truncated` when the gated totals aggregate returned exactly `MAX_GROUPS` groups (spec §9.0
+ * Truncation, MOD-02). A clamped not-worked count adds no caveat (no code exists for it; instructions §8 item 13).
  */
 export const deriveOtifOutcome: Derive<OtifOutcomeRaw, OutcomeHeadline> = (raw, selection, config = METRICS_CONFIG) => {
-  const { headline } = outcomeHeadline(
+  const headline = outcomeHeadline(
     { mode: raw.mode, window: raw.window, totals: raw.totals, workedIds: raw.workedIds, verdicts: raw.verdicts },
     config,
   );
@@ -26,6 +28,7 @@ export const deriveOtifOutcome: Derive<OtifOutcomeRaw, OutcomeHeadline> = (raw, 
       ["unstratified", "not-worked-includes-unalerted", "gate-differs"],
       caveatsIf(hasFilters(selection.filters), ["filters-not-applied"]),
       caveatsIfNow(raw.window.key, ["now-all-time"]),
+      truncationCaveats(null, [raw.totals], config),
     ),
   };
 };

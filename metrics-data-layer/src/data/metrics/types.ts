@@ -145,20 +145,59 @@ export interface BlockedInfo {
   readonly reason: BlockedReason;
   readonly unblockedBy: string;
 }
-/**
- * Result envelope of every card (spec §10). `data` is kept while `loading` (previous data);
- * `computedAt` comes from the cache entry (ISO); `caveats` de-duplicated, in config order.
- */
-export interface MetricResult<T> {
-  readonly status: MetricStatus;
-  readonly data?: T;
+/** Fields every `MetricResult` variant carries (spec §10). */
+interface MetricResultBase {
+  /** Caveat codes, de-duplicated, in config order. */
   readonly caveats: readonly Caveat[];
+  /**
+   * ISO-8601 UTC. Settled results: the cache entry's time (spec §10 "from the cache entry, not the render");
+   * `loading`: the previous result's, or the request time when there is none.
+   */
   readonly computedAt: string;
+  /** Resolved window of the request. */
   readonly window: Window;
-  readonly error?: string;
-  readonly blocked?: BlockedInfo;
+  /** Rows loaded so far by this load (paged loaders); absent when nothing was reported. */
   readonly progress?: Progress;
 }
+/** `ok` / `partial`: the card data is present. */
+interface MetricResultSettled<T> extends MetricResultBase {
+  readonly status: "ok" | "partial";
+  readonly data: T;
+  readonly error?: undefined;
+  readonly blocked?: undefined;
+}
+/** `loading`: the previous result's data is kept when there is one. */
+interface MetricResultLoading<T> extends MetricResultBase {
+  readonly status: "loading";
+  readonly data?: T;
+  readonly error?: undefined;
+  readonly blocked?: undefined;
+}
+/** `blocked`: why, and what unblocks it; never data. */
+interface MetricResultBlocked extends MetricResultBase {
+  readonly status: "blocked";
+  readonly blocked: BlockedInfo;
+  readonly data?: undefined;
+  readonly error?: undefined;
+}
+/** `error`: the message (`breakdown-not-allowed`, `aborted`, or the failure's message); never data. */
+interface MetricResultError extends MetricResultBase {
+  readonly status: "error";
+  readonly error: string;
+  readonly data?: undefined;
+  readonly blocked?: undefined;
+}
+/**
+ * Result envelope of every card: spec §10 field names, as a union discriminated on `status` (instructions §10
+ * "discriminated unions over optional-field soup"; post-freeze change TYP-01). After `status === "ok"` or
+ * `"partial"`, `data` is `T`; after `"blocked"`, `blocked` is set; after `"error"`, `error` is a string.
+ * `data?.x` reads still compile on the whole union (absent fields are typed `undefined`).
+ */
+export type MetricResult<T> =
+  | MetricResultSettled<T>
+  | MetricResultLoading<T>
+  | MetricResultBlocked
+  | MetricResultError;
 
 /**
  * What a loader returns: raw, unit- and threshold-independent data plus fetch-level caveats

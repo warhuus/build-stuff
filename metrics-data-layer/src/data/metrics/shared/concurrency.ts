@@ -4,7 +4,8 @@
  * (`INNER_CONCURRENCY`) and never the semaphore, so no deadlock is possible.
  */
 import { APP_SEMAPHORE_SLOTS, INNER_CONCURRENCY } from "../../../config/metrics";
-import { abortError, throwIfAborted } from "./errors";
+import { mapLimited } from "../source/batching";
+import { abortError } from "./errors";
 
 /** Releases a held slot; idempotent. */
 export type Release = () => void;
@@ -100,34 +101,17 @@ export const appSemaphore: Semaphore = createSemaphore(APP_SEMAPHORE_SLOTS);
 
 /**
  * Runs tasks with at most `limit` in flight (inner id-batch limiter; never the app semaphore). Tasks start in
- * order; no new task starts once `signal` has aborted or a task has failed.
+ * order; no new task starts once `signal` has aborted or a task has failed. Same limiter as the source
+ * adapters' id chunks (`source/batching.mapLimited`), so there is one implementation.
  * @param tasks task factories.
  * @param limit maximum concurrent tasks (default `INNER_CONCURRENCY`); values below 1 act as 1.
  * @param signal optional abort signal, checked before each task starts.
  * @returns results in task order; rejects with the first task error or an abort error.
  */
-export async function runLimited<T>(
+export function runLimited<T>(
   tasks: readonly (() => Promise<T>)[],
   limit: number = INNER_CONCURRENCY,
   signal?: AbortSignal,
 ): Promise<T[]> {
-  const results = new Array<T>(tasks.length);
-  let next = 0;
-  let failed = false;
-  const worker = async (): Promise<void> => {
-    while (next < tasks.length && !failed) {
-      throwIfAborted(signal);
-      const i = next;
-      next += 1;
-      try {
-        results[i] = await tasks[i]();
-      } catch (e: unknown) {
-        failed = true;
-        throw e;
-      }
-    }
-  };
-  const workers = Math.min(Math.max(1, Math.floor(limit)), tasks.length);
-  await Promise.all(Array.from({ length: workers }, worker));
-  return results;
+  return mapLimited(tasks, limit, signal, (task) => task());
 }

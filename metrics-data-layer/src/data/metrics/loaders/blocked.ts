@@ -5,6 +5,7 @@
  */
 import type { MetricsConfig } from "../../../config/metrics";
 import { CARD_META, INTEGRATION_UNBLOCKED_BY } from "../../../config/metricsText";
+import type { Loader } from "../source/MetricsSource";
 import type { BlockedInfo, CardId, Caveat } from "../types";
 
 /** Why a card is blocked, what unblocks it, and the caveats the blocked result carries. */
@@ -37,3 +38,10 @@ export function integrationBlock(cardId: CardId, config: MetricsConfig): Blocked
     ? null
     : { reason: "needs-integration-value", unblockedBy: INTEGRATION_UNBLOCKED_BY[key], caveats: ["needs-integration-value"] };
 }
+
+/**
+ * Loader of a second-draft stub (spec §9 3.2, 3.3, 4.7). Never reached: loadCard returns the stub's blocked
+ * result (`stubBlocked`) before any load (D13). Kept so `CARD_IMPL` is total over `CardId`; makes no call.
+ * @returns `{ raw: null, status: "ok", caveats: [] }`.
+ */
+export const loadStub: Loader<null> = () => Promise.resolve({ raw: null, status: "ok", caveats: [] });

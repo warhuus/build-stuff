@@ -6,6 +6,7 @@
 import { CLOSURE_PRECEDENCE } from "../../../config/metrics";
 import type { MetricsConfig } from "../../../config/metrics";
 import type { AlertAttrs, AlertEventRow, AlertLifecycleRow, ClosureGroup } from "../types";
+import { groupRows } from "./breakdown";
 import {
   compareEvents,
   compareTimestamps,
@@ -132,22 +133,6 @@ export function alertFactsOf(
 }
 
 /**
- * Groups event rows by `riskAlertId`. Map order = first appearance; each list keeps input order.
- * Empty input → empty map.
- */
-export function groupEventsByAlert<E extends { readonly riskAlertId: string }>(
-  rows: readonly E[],
-): Map<string, E[]> {
-  const byAlert = new Map<string, E[]>();
-  for (const row of rows) {
-    const list = byAlert.get(row.riskAlertId);
-    if (list) list.push(row);
-    else byAlert.set(row.riskAlertId, [row]);
-  }
-  return byAlert;
-}
-
-/**
  * Facts for every id in `alertIds` (in that order, duplicates collapsed) from a pool of event rows that
  * may cover other alerts too; `openNowIds` = alerts open now (AlertOrderFulfillment rows). An id with no
  * events gets all-null facts, `worked: false`. Spec §9.0.1 L2, decision D2 (4.2 not-worked).
@@ -158,6 +143,6 @@ export function alertFactsForIds(
   openNowIds: ReadonlySet<string>,
   config: MetricsConfig,
 ): AlertLifecycleRow[] {
-  const byAlert = groupEventsByAlert(rows);
+  const byAlert = groupRows(rows, (row) => row.riskAlertId);
   return [...new Set(alertIds)].map((id) => alertFactsOf(id, byAlert.get(id) ?? [], openNowIds.has(id), config));
 }

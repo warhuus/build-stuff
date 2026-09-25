@@ -78,7 +78,8 @@ describe("useMetric: every card, typed by card id (instructions §7)", () => {
     expectTypeOf(r.rolled).toEqualTypeOf<MetricResult<CardData<readonly RolledMonthRow[]>>>();
     // Blocked stubs are settled synchronously, on the first render.
     expect(r.movement.status).toBe("blocked");
-    expect(r.itemFunnel).toMatchObject({ status: "loading", caveats: [], computedAt: "" });
+    // No previous result: computedAt is the request time (SPF-02).
+    expect(r.itemFunnel).toMatchObject({ status: "loading", caveats: [], computedAt: FIXTURE_NOW.toISOString() });
     await waitFor(() => {
       const statuses = Object.values(result.current).map((x) => x.status);
       expect(statuses.filter((st) => st === "loading")).toEqual([]);

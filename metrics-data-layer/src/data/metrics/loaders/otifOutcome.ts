@@ -6,17 +6,18 @@
  * window and combine are derive's job. `VERDICT_DATE_PROPERTY` placeholder blocking happens in loadCard (D13).
  */
 import { workedItems } from "../query/build";
-import { sortedDistinct, sourceCtxOf } from "../shared/sourceCtx";
+import { sortedDistinct } from "../compute/stats";
+import { sourceCtxOf } from "../shared/sourceCtx";
 import type { Loader, MetricsSource, SourceCtx } from "../source/MetricsSource";
-import type { OtifOutcomeRaw, Paged, VerdictRow, Window } from "../types";
+import type { ItemRow, OtifOutcomeRaw, Paged, VerdictRow, Window } from "../types";
 import { resolveWindow } from "../window";
-import { funnelLoaderOutput } from "./funnelLoaderOutput";
+import { loaderOutput } from "./loaderOutput";
 
-/** Worked ids and their verdict rows, plus whether either paged fetch hit the row cap. */
+/** Worked ids and their verdict rows, plus the two paged fetches (for `row-cap`). */
 interface WorkedVerdicts {
   readonly workedIds: readonly string[];
+  readonly items: Paged<ItemRow>;
   readonly verdicts: Paged<VerdictRow>;
-  readonly idsCapped: boolean;
 }
 
 /**
@@ -28,7 +29,7 @@ async function workedVerdicts(window: Window, source: MetricsSource, ctx: Source
   const items = await source.fetchItems(workedItems(window), ctx);
   const workedIds = sortedDistinct(items.rows.map((row) => row.salesOrderId));
   const verdicts = await source.fetchVerdictsByIds(workedIds, ctx);
-  return { workedIds, verdicts, idsCapped: items.capped };
+  return { workedIds, items, verdicts };
 }
 
 /**
@@ -37,8 +38,8 @@ async function workedVerdicts(window: Window, source: MetricsSource, ctx: Source
  * @param _breakdown ignored: 4.1 has no breakdowns (registry; loadCard rejects any).
  * @param deps source, now, signal, onProgress (paged id fetch and verdict chunks), config.
  * @returns raw `{ window, dimension: null, mode, totals, workedIds, verdicts }`; status "partial" with
- * `row-cap` when the worked-id fetch or the verdict lookup was capped (D11); `truncated` when the totals
- * aggregate returned exactly `MAX_GROUPS` groups. Rejects on source error or abort.
+ * `row-cap` when the worked-id fetch or the verdict lookup was capped (D11; `truncated` of the totals
+ * aggregate is derive's, MOD-02). Rejects on source error or abort.
  */
 export const loadOtifOutcome: Loader<OtifOutcomeRaw> = async (selection, _breakdown, deps) => {
   const window = resolveWindow(selection.window, deps.now);
@@ -55,6 +56,5 @@ export const loadOtifOutcome: Loader<OtifOutcomeRaw> = async (selection, _breakd
     workedIds: worked.workedIds,
     verdicts: worked.verdicts.rows,
   };
-  const capped = worked.idsCapped || worked.verdicts.capped;
-  return funnelLoaderOutput(raw, { capped, grouped: [totals] }, deps.config);
+  return loaderOutput(raw, [worked.items, worked.verdicts]);
 };

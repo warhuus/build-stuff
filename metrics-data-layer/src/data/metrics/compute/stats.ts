@@ -13,10 +13,11 @@ export function safeDivide(numerator: number | null, denominator: number | null)
 }
 
 /**
- * Share `part / whole` as a fraction (0..1 for a part of its whole), `null` when `whole` is 0 or either
- * side is null. Same arithmetic as `safeDivide`; the name states intent. Instructions §8 item 7.
+ * Percentage `part / whole`, expressed as a fraction (0..1 for a part of its whole; instructions §4
+ * `percent`), `null` when `whole` is 0 or either side is null. Same arithmetic as `safeDivide`; the name
+ * states intent. Instructions §8 item 7.
  */
-export function fraction(part: number | null, whole: number | null): number | null {
+export function percent(part: number | null, whole: number | null): number | null {
   return safeDivide(part, whole);
 }
 
@@ -30,12 +31,6 @@ export function sumBy<R>(rows: readonly R[], valueOf: (row: R) => number): numbe
   return rows.reduce((total, row) => total + valueOf(row), 0);
 }
 
-/** Sum of the non-null values; `null` when every value is null or the list is empty. */
-export function sumNullable(values: readonly (number | null)[]): number | null {
-  const present = values.filter((value): value is number => value !== null);
-  return present.length === 0 ? null : sum(present);
-}
-
 /** `value` clamped at 0 from below (a subtraction that must never go negative). Spec §9 3.1, 4.6. */
 export function clampNonNegative(value: number): number {
   return Math.max(0, value);
@@ -47,4 +42,22 @@ export function clampNonNegative(value: number): number {
  */
 export function remainder(total: number, parts: readonly number[]): number {
   return clampNonNegative(total - sum(parts));
+}
+
+/**
+ * Locale-independent string order by UTF-16 code unit (the tie-break of every name sort, instructions §5
+ * rule 11). @returns negative / 0 / positive like `Array.prototype.sort` comparators.
+ */
+export function compareCodeUnits(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+/**
+ * Distinct ids sorted by `compareCodeUnits`, for deterministic output and id lookups.
+ * @param ids ids in any order, duplicates allowed.
+ * @returns a new sorted array without duplicates; empty input → empty array.
+ */
+export function sortedDistinct(ids: Iterable<string>): string[] {
+  return [...new Set(ids)].sort(compareCodeUnits);
 }

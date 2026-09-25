@@ -21,7 +21,7 @@ import {
   itemFiltersWhere,
   openAlertWhere,
   openInWindowWhere,
-  riskWhere,
+  compileRiskCondition,
   type PredicateClauses,
 } from "./compileWhere";
 
@@ -152,7 +152,7 @@ function compileRisk(c: Ctx, s: RiskSet): ObjectSet<SalesOrderOtifEvaluation> {
         ? c.client(c.sdk.SalesOrderOtifEvaluation)
         : compileItems(c, s.items).pivotTo("otifEvaluation");
     case "where":
-      return compileRisk(c, s.base).where(riskWhere(s.condition, c.config));
+      return compileRisk(c, s.base).where(compileRiskCondition(s.condition, c.config));
     case "intersect":
     case "union":
     case "subtract":

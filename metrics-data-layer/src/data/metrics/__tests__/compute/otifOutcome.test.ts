@@ -35,6 +35,8 @@ describe("otifOutcome helpers", () => {
     expect(inVerdictWindow("2026-09-25", w7)).toBe(false);
     expect(inVerdictWindow(null, w7)).toBe(false);
     expect(inVerdictWindow("2020-01-01", win("now"))).toBe(true);
+    expect(inVerdictWindow("2026-09-17T23:00:00Z", w7)).toBe(true); // timestamp → its UTC date
+    expect(inVerdictWindow("not a date", w7)).toBe(false);
   });
 });
 
@@ -58,7 +60,7 @@ describe("outcomeHeadline", () => {
   };
 
   it("filters worked rows, denominator made + not-made only, not-worked by subtraction", () => {
-    const { headline, clamped } = outcomeHeadline(input, METRICS_CONFIG);
+    const headline = outcomeHeadline(input, METRICS_CONFIG);
     // worked: 1 (made), 2 (not made) → n 2, made 1; totals n 20, made 10 → not worked n 18, made 9
     expect(headline).toEqual({
       mode: "otif",
@@ -70,22 +72,22 @@ describe("outcomeHeadline", () => {
       notWorkedMade: 9,
       missingVerdict: 2, // ids 6 and 7 (7 once)
     });
-    expect(clamped).toBe(false);
   });
 
   it("n = 0 → null rates; worked above totals clamps at 0", () => {
-    const { headline, clamped } = outcomeHeadline({ ...input, mode: "crit", totals: [] }, METRICS_CONFIG);
+    const headline = outcomeHeadline({ ...input, mode: "crit", totals: [] }, METRICS_CONFIG);
     // crit: every row passes the crit gate and says CRIT; row 4 is outside the window → worked 1, 2, 3, 5
     expect(headline.workedN).toBe(4);
     expect(headline.notWorkedN).toBe(0);
     expect(headline.notWorkedMade).toBe(0);
     expect(headline.notWorkedRate).toBeNull();
-    expect(clamped).toBe(true);
-    expect(outcomeHeadline({ ...input, verdicts: [], totals: [] }, METRICS_CONFIG).headline.workedRate).toBeNull();
+    expect(outcomeHeadline({ ...input, verdicts: [], totals: [] }, METRICS_CONFIG).workedRate).toBeNull();
   });
 
   it("clamps when only the made count exceeds", () => {
-    const { clamped } = outcomeHeadline({ ...input, totals: [{ group: "Not OTIF", count: 5 }] }, METRICS_CONFIG);
-    expect(clamped).toBe(true);
+    // totals: not made 5, made 0; worked made 1 → notWorkedMade = max(0, 0 − 1) = 0; n = 5 − 2 = 3
+    const headline = outcomeHeadline({ ...input, totals: [{ group: "Not OTIF", count: 5 }] }, METRICS_CONFIG);
+    expect(headline.notWorkedMade).toBe(0);
+    expect(headline.notWorkedN).toBe(3);
   });
 });

@@ -4,7 +4,6 @@ import {
   closedNotOpenNow,
   escalatedEvents,
   events,
-  hasItemFilters,
   humanEvents,
   itemsWithEvent,
   itemsWithOpenAlertWhere,
@@ -13,12 +12,13 @@ import {
   l3OpenedEvents,
   openAlerts,
   openedEventsOfItemsOf,
-  openItemsInWindow,
+  itemsOpenInWindow,
   touchedEventsChain,
   touchedOpenAlerts,
   withItemFilters,
   workedItems,
 } from "../../query/build";
+import { hasFilters } from "../../selection";
 import type { ItemFilters, Window } from "../../types";
 
 const NONE: ItemFilters = { businessLine: [], productLine: [], region: [], plant: [] };
@@ -30,14 +30,14 @@ const FILTERED_ITEMS = { kind: "filtered", base: { kind: "all" }, filters: BL } 
 
 describe("withItemFilters (spec §9.0)", () => {
   it("returns the base set itself when every dimension is empty (no condition emitted)", () => {
-    const base = openItemsInWindow(W7);
+    const base = itemsOpenInWindow(W7);
     expect(withItemFilters(base, NONE)).toBe(base);
-    expect(hasItemFilters(NONE)).toBe(false);
+    expect(hasFilters(NONE)).toBe(false);
   });
 
   it("wraps the base with the filters when any dimension is set; one condition per non-empty dim at compile", () => {
     expect(withItemFilters(allItems, TWO)).toEqual({ kind: "filtered", base: { kind: "all" }, filters: TWO });
-    expect(hasItemFilters(TWO)).toBe(true);
+    expect(hasFilters(TWO)).toBe(true);
   });
 });
 
@@ -65,7 +65,7 @@ describe("events (spec §9.0 events)", () => {
 
 describe("item and open-alert sets", () => {
   it("2.0 under now is the openInWindow spec with start null (compiler emits isOpen only)", () => {
-    expect(openItemsInWindow(NOW)).toEqual({ kind: "openInWindow", window: { key: "now", start: null, end: NOW.end } });
+    expect(itemsOpenInWindow(NOW)).toEqual({ kind: "openInWindow", window: { key: "now", start: null, end: NOW.end } });
   });
 
   it("aofSet: all open alerts without filters, open alerts of the filtered items with filters", () => {

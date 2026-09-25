@@ -3,7 +3,8 @@
  * of spec §8 (see `fakeEval.ts`, `fakeGroups.ts`, `fakePaging.ts`). Every call is recorded in `calls`
  * (method + arguments without the ctx) so loader tests can assert which calls were made (Appendix A X2).
  */
-import type { MetricsConfig } from "../../../../config/metrics";
+import { throwIfAborted } from "../../compute/abort";
+import { openAlertDimValue } from "../../compute/dimValues";
 import type { AlertEventRow, ItemRow, OpenAlertRow, VerdictRow, Window } from "../../types";
 import { inWindow } from "../../window";
 import type {
@@ -11,15 +12,14 @@ import type {
   EventGroupField,
   EventSet,
   ItemSet,
-  OpenAlertGroupField,
   OpenAlertSet,
   RiskSet,
 } from "../../query/specs";
 import type { MetricsSource, SourceCtx } from "../MetricsSource";
 import { createEvalCtx, evalEvents, evalItems, evalOpenAlerts, evalRisk } from "./fakeEval";
 import type { EvalCtx } from "./fakeEval";
-import { countByRanges, countValueByGroup, countValueOf, distinctByGroup, exactDistinct, verdictDateOf, verdictTotals } from "./fakeGroups";
-import { createStats, lookupByIds, pageRows, throwIfAborted } from "./fakePaging";
+import { countByRanges, countValueByGroup, countValueOf, distinctByGroup, exactDistinct, verdictRowOf, verdictTotals } from "./fakeGroups";
+import { createStats, lookupByIds, pageRows } from "./fakePaging";
 import type { FakeStats } from "./fakePaging";
 import type {
   FixtureAppUsage,
@@ -27,7 +27,6 @@ import type {
   FixtureItem,
   FixtureOpenAlert,
   FixtureRisk,
-  FixtureVerdict,
   MetricsFixtures,
 } from "./fakeTypes";
 import { FIXTURES } from "./fixtures";
@@ -83,21 +82,6 @@ function eventGroupOf(field: EventGroupField): (e: FixtureEvent) => string | nul
   }
 }
 
-/** Spec §9.0 `aofGroupBy`; escalated booleans become `ESCALATED_GROUP_LABELS` (null dropped). */
-function openAlertGroupOf(field: OpenAlertGroupField, config: MetricsConfig): (a: FixtureOpenAlert) => string | null {
-  const labels = config.ESCALATED_GROUP_LABELS;
-  switch (field) {
-    case "routingPersona":
-      return (a) => a.persona;
-    case "priority":
-      return (a) => a.priority;
-    case "alertType":
-      return (a) => a.riskType;
-    case "escalated":
-      return (a) => (a.escalated === null ? null : a.escalated ? labels.true : labels.false);
-  }
-}
-
 const rowsOf = <R>(keys: ReadonlySet<string>, rows: readonly R[], keyOf: (r: R) => string): R[] =>
   rows.filter((r) => keys.has(keyOf(r)));
 
@@ -138,7 +122,7 @@ function aggregateMethods(data: MetricsFixtures): AggregateMethods {
       distinctByGroup(eventsIn(data, set, ctx), eventGroupOf(g), distinctOf(d), ctx.config.MAX_GROUPS),
     countOpenAlerts: async (set, ctx) => alertsIn(data, set, ctx).length,
     countOpenAlertsBy: async (set, g, ctx) =>
-      distinctByGroup(alertsIn(data, set, ctx), openAlertGroupOf(g, ctx.config), (a) => a.riskAlertId, ctx.config.MAX_GROUPS),
+      distinctByGroup(alertsIn(data, set, ctx), (a) => openAlertDimValue(a, g, ctx.config), (a) => a.riskAlertId, ctx.config.MAX_GROUPS),
     countRisk: async (set, ctx) => riskIn(data, set, ctx).length,
     countRiskByScoreRange: async (set, ranges, ctx) => countByRanges(riskIn(data, set, ctx).map((r) => r.otifScore), ranges),
     countAppUsers: async (w, ctx) => exactDistinct(appUsageIn(data, w, ctx), (u) => u.userId),
@@ -165,18 +149,6 @@ function fetchMethods(data: MetricsFixtures, stats: FakeStats): FetchMethods {
         rowsOf(chunk, data.verdicts, (v) => v.otifOrderId).map((v) => verdictRowOf(v, ctx.config));
       return lookupByIds(ids, size, verdicts, ctx, stats);
     },
-  };
-}
-
-/** Maps a verdict row; `verdictDate` = the `VERDICT_DATE_PROPERTY` date (null while a placeholder). */
-function verdictRowOf(v: FixtureVerdict, config: MetricsConfig): VerdictRow {
-  return {
-    otifOrderId: v.otifOrderId,
-    otifVerdict: v.otifVerdict,
-    critVerdict: v.critVerdict,
-    otifExclusion: v.otifExclusion,
-    critExclusion: v.critExclusion,
-    verdictDate: verdictDateOf(v, config.VERDICT_DATE_PROPERTY),
   };
 }
 

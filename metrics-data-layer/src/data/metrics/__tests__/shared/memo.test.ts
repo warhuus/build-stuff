@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearMetricsCache } from "../../shared/cache";
-import { createSharedMemo } from "../../shared/memo";
+import { createSharedMemo, memoKey } from "../../shared/memo";
+import { EMPTY_FILTERS } from "../../selection";
 import { deferred, flush } from "./deferred";
 
 describe("createSharedMemo (D7)", () => {
@@ -142,5 +143,11 @@ describe("createSharedMemo (D7)", () => {
     await memo.get("a", () => Promise.resolve(1));
     memo.clear();
     expect(memo.peek("a")).toBeUndefined();
+  });
+
+  it("memoKey is window.key | filtersKey, or filtersKey alone without a window (spec §11)", () => {
+    const w = { key: 7, start: "2026-09-17T00:00:00.000Z", end: "2026-09-24T00:00:00.000Z" } as const;
+    expect(memoKey(w, { ...EMPTY_FILTERS, region: ["EMEA", "AMER", "AMER"] })).toBe("7|bl=;pl=;rg=AMER,EMEA;pt=");
+    expect(memoKey(null, EMPTY_FILTERS)).toBe("bl=;pl=;rg=;pt=");
   });
 });

@@ -12,9 +12,11 @@ import { deriveFirstViewToClosure, deriveRaisedToClosed, deriveRaisedToFirstView
 import { deriveItemFunnel } from "./compute/deriveItemFunnel";
 import { deriveOtifOutcome } from "./compute/deriveOtifOutcome";
 import { deriveRiskDistribution } from "./compute/deriveRiskDistribution";
+import { deriveStubRows } from "./compute/deriveStub";
 import { deriveUserFunnel } from "./compute/deriveUserFunnel";
 import { mergeCaveats } from "./compute/caveats";
 import { loadAgeingBacklog } from "./loaders/ageingBacklog";
+import { loadStub } from "./loaders/blocked";
 import { loadClosureComposition } from "./loaders/closureComposition";
 import { loadFirstViewToClosure } from "./loaders/firstViewToClosure";
 import { loadItemFunnel } from "./loaders/itemFunnel";
@@ -65,21 +67,6 @@ export function funnelStageCaveats(data: CardData<FunnelSeries>): readonly Cavea
  */
 export function noStageCaveats(): readonly Caveat[] {
   return [];
-}
-
-/**
- * Loader of a second-draft stub (spec §9 3.2, 3.3, 4.7). Never reached: loadCard returns the stub's blocked
- * result before any load (D13). Kept so `CARD_IMPL` is total over `CardId`; makes no call.
- * @returns `{ raw: null, status: "ok", caveats: [] }`.
- */
-export const loadStub: Loader<null> = () => Promise.resolve({ raw: null, status: "ok", caveats: [] });
-
-/**
- * Derive of a second-draft stub (never reached, see `loadStub`).
- * @returns an empty row list as the total, no breakdown, no caveats.
- */
-export function deriveStubRows<T>(): Derive<null, readonly T[]> {
-  return () => ({ data: { total: [], breakdown: null }, caveats: [] });
 }
 
 /**

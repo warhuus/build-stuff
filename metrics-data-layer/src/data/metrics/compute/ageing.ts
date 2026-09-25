@@ -16,7 +16,7 @@ import type {
 import { daysBetween } from "../window";
 import { assignBin, countBins, zeroFilledBins } from "./bins";
 import { compareTimestamps } from "./eventPredicates";
-import { fraction } from "./stats";
+import { percent } from "./stats";
 
 /**
  * `raised(a)` per alert (spec §4): the earliest `eventTimestamp` of its opened events. The rows are the
@@ -121,7 +121,7 @@ export function thresholdTiles(
   const past = aged.filter((entry) => entry.ageDays !== null && entry.ageDays > days);
   const pastItems = new Set(past.map((entry) => entry.alert.salesOrderId));
   const valueUsd = [...pastItems].reduce((total, id) => total + itemValue(id, items), 0);
-  return { days, alerts: past.length, valueUsd, pct: fraction(past.length, knownAges(aged).length) };
+  return { days, alerts: past.length, valueUsd, pct: percent(past.length, knownAges(aged).length) };
 }
 
 /** Inputs of `ageingBacklog`: the (possibly group-restricted) aged alerts, items by id, `asOf`, N. */

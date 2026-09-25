@@ -2,13 +2,16 @@
  * The five row-fetch port methods on OSDK (spec §9.0.1 L1–L3, §9.0 `itemsById`, §9 4.1 verdicts). Every fetch
  * pages through `paging.ts` (PAGE_SIZE, ROW_CAP, abort, progress). Id lookups: empty list → no request
  * (OSDK `$in: []` matches all objects; decision D14); duplicates removed; chunks of `ID_BATCH` with at most
- * `INNER_CONCURRENCY` in flight (own limiter; Appendix A X3). Missing ids are simply absent.
+ * `INNER_CONCURRENCY` in flight (the source limiter `batching.mapLimited`; Appendix A X3). Missing ids are
+ * simply absent.
  */
 import type { AlertEventRow, ItemRow, OpenAlertRow, Paged, VerdictRow } from "../../types";
 import type { EventSet, ItemSet, OpenAlertSet } from "../../query/specs";
 import type { SourceCtx } from "../MetricsSource";
 import { compilerFor, type OsdkDeps } from "./osdkAggregates";
-import { chunkIds, createProgress, fetchMapped, mergePaged, runLimited, throwIfAborted } from "./paging";
+import { throwIfAborted } from "../../compute/abort";
+import { createProgress, idChunks, mapLimited, mergePaged } from "../batching";
+import { fetchFirstPage, fetchMapped } from "./paging";
 import {
   EVENT_SELECT,
   ITEM_SELECT,
@@ -67,8 +70,8 @@ export async function fetchItemsByIds(deps: OsdkDeps, ids: readonly string[], ct
   throwIfAborted(ctx.signal);
   const { ID_BATCH, INNER_CONCURRENCY, PAGE_SIZE, ROW_CAP } = ctx.config;
   const progress = createProgress(ctx);
-  const parts = await runLimited(chunkIds(unique, ID_BATCH), INNER_CONCURRENCY, ctx.signal, (chunk) => {
-    const s = deps.client(deps.sdk.SalesOrders).where({ salesOrderId: { $in: chunk } });
+  const parts = await mapLimited(idChunks(unique, ID_BATCH), INNER_CONCURRENCY, ctx.signal, (batch) => {
+    const s = deps.client(deps.sdk.SalesOrders).where({ salesOrderId: { $in: batch } });
     return fetchMapped(
       (token) => s.fetchPage({ $select: ITEM_SELECT, $pageSize: PAGE_SIZE, $nextPageToken: token }),
       toItemRow,
@@ -81,15 +84,13 @@ export async function fetchItemsByIds(deps: OsdkDeps, ids: readonly string[], ct
 
 type VerdictMap = (r: OsdkVerdictRow) => VerdictRow | null;
 
-/** `"eq"` lookup: one `$eq` fetch per id with `$pageSize: 1`, INNER_CONCURRENCY in flight. */
+/** `"eq"` lookup: one `$eq` fetch per id with `$pageSize: 1` (via `paging.fetchFirstPage`), INNER_CONCURRENCY in flight. */
 async function verdictsByEq(deps: OsdkDeps, ids: string[], ctx: SourceCtx, map: VerdictMap): Promise<Paged<VerdictRow>> {
   const progress = createProgress(ctx);
   const oov = deps.client(deps.sdk.OtifOrderVerdict);
-  const parts = await runLimited(ids, ctx.config.INNER_CONCURRENCY, ctx.signal, async (id) => {
-    const page = await oov.where({ otifOrderId: { $eq: id } }).fetchPage({ $select: VERDICT_SELECT, $pageSize: 1 });
-    const rows = (Array.isArray(page.data) ? page.data : []).slice(0, 1).flatMap((r) => map(r) ?? []);
-    progress(rows.length);
-    return { rows, capped: false };
+  const parts = await mapLimited(ids, ctx.config.INNER_CONCURRENCY, ctx.signal, (id) => {
+    const s = oov.where({ otifOrderId: { $eq: id } });
+    return fetchFirstPage(() => s.fetchPage({ $select: VERDICT_SELECT, $pageSize: 1 }), map, ctx.signal, 1, progress);
   });
   return mergePaged(parts, ctx.config.ROW_CAP);
 }
@@ -98,8 +99,8 @@ async function verdictsByEq(deps: OsdkDeps, ids: string[], ctx: SourceCtx, map: 
 async function verdictsByIn(deps: OsdkDeps, ids: string[], ctx: SourceCtx, map: VerdictMap): Promise<Paged<VerdictRow>> {
   const { ID_BATCH, INNER_CONCURRENCY, PAGE_SIZE, ROW_CAP } = ctx.config;
   const progress = createProgress(ctx);
-  const parts = await runLimited(chunkIds(ids, ID_BATCH), INNER_CONCURRENCY, ctx.signal, (chunk) => {
-    const s = deps.client(deps.sdk.OtifOrderVerdict).where({ otifOrderId: { $in: chunk } });
+  const parts = await mapLimited(idChunks(ids, ID_BATCH), INNER_CONCURRENCY, ctx.signal, (batch) => {
+    const s = deps.client(deps.sdk.OtifOrderVerdict).where({ otifOrderId: { $in: batch } });
     return fetchMapped(
       (token) => s.fetchPage({ $select: VERDICT_SELECT, $pageSize: PAGE_SIZE, $nextPageToken: token }),
       map,

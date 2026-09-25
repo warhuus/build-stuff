@@ -24,7 +24,7 @@ describe("errors", () => {
   it("errorMessage normalises any thrown value", () => {
     expect(errorMessage(new Error("boom"))).toBe("boom");
     expect(errorMessage(new TypeError(""))).toBe("TypeError");
-    expect(errorMessage(abortError())).toBe("AbortError");
+    expect(errorMessage(abortError())).toBe("aborted");
     expect(errorMessage("breakdown-not-allowed")).toBe("breakdown-not-allowed");
     expect(errorMessage({ message: "from object" })).toBe("from object");
     expect(errorMessage({ message: 3 })).toBe("[object Object]");

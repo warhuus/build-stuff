@@ -27,17 +27,16 @@ import {
   itemsGrouped,
   openAlertsGrouped,
   riskByRanges,
+  finiteOrZero,
   verdictsGrouped,
 } from "./groupBy";
-import { throwIfAborted } from "./paging";
+import { throwIfAborted } from "../../compute/abort";
 
 /** The injected dependencies of the adapter (Appendix A X5). */
 export interface OsdkDeps {
   readonly client: Client;
   readonly sdk: OsdkObjectTypes;
 }
-
-const num = (v: number | null | undefined): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
 /** A spec compiler for this call's config; rejects with AbortError when already aborted. */
 export function compilerFor(deps: OsdkDeps, ctx: SourceCtx): SpecCompiler {
@@ -50,7 +49,7 @@ export async function countItems(deps: OsdkDeps, set: ItemSet, ctx: SourceCtx): 
   const r = await compilerFor(deps, ctx).items(set).aggregate({
     $select: { $count: "unordered", "valueUsd:sum": "unordered" },
   });
-  return { count: num(r.$count), valueUsd: num(r.valueUsd?.sum) };
+  return { count: finiteOrZero(r.$count), valueUsd: finiteOrZero(r.valueUsd?.sum) };
 }
 
 /** Items grouped by an item dimension (`$exactWithLimit: MAX_GROUPS`). Spec §9.0 `stageByItemDim`. */
@@ -63,10 +62,10 @@ export async function countEvents(deps: OsdkDeps, set: EventSet, d: EventDistinc
   const s = compilerFor(deps, ctx).events(set);
   if (d === "actor") {
     const r = await s.aggregate({ $select: { "eventActor:exactDistinct": "unordered" } });
-    return num(r.eventActor?.exactDistinct);
+    return finiteOrZero(r.eventActor?.exactDistinct);
   }
   const r = await s.aggregate({ $select: { "riskAlertId:exactDistinct": "unordered" } });
-  return num(r.riskAlertId?.exactDistinct);
+  return finiteOrZero(r.riskAlertId?.exactDistinct);
 }
 
 /** The same grouped by an AlertHistory group-by field. Spec §9.0 `ahGroupBy`. */
@@ -83,7 +82,7 @@ export async function countEventsBy(
 /** `$count` of an open-alert set. Spec §9 2.1 alert view. */
 export async function countOpenAlerts(deps: OsdkDeps, set: OpenAlertSet, ctx: SourceCtx): Promise<number> {
   const r = await compilerFor(deps, ctx).openAlerts(set).aggregate({ $select: { $count: "unordered" } });
-  return num(r.$count);
+  return finiteOrZero(r.$count);
 }
 
 /** Open alerts grouped by an AlertOrderFulfillment field. Spec §9.0 `aofGroupBy`. */
@@ -99,7 +98,7 @@ export async function countOpenAlertsBy(
 /** `$count` of a risk set. Spec §9 3.1. */
 export async function countRisk(deps: OsdkDeps, set: RiskSet, ctx: SourceCtx): Promise<number> {
   const r = await compilerFor(deps, ctx).risk(set).aggregate({ $select: { $count: "unordered" } });
-  return num(r.$count);
+  return finiteOrZero(r.$count);
 }
 
 /** `$count` per `otifScore` `$ranges` (no `$exactWithLimit`). Spec §9 3.1 `byRange`. */
@@ -120,7 +119,7 @@ function appUsageSet(deps: OsdkDeps, w: Window, ctx: SourceCtx): ObjectSet<AppUs
 /** Distinct `userId` of alert-app usage in the window. Spec §9 1.1. Throws on a placeholder ALERT_APP_ID. */
 export async function countAppUsers(deps: OsdkDeps, w: Window, ctx: SourceCtx): Promise<number> {
   const r = await appUsageSet(deps, w, ctx).aggregate({ $select: { "userId:exactDistinct": "unordered" } });
-  return num(r.userId?.exactDistinct);
+  return finiteOrZero(r.userId?.exactDistinct);
 }
 
 /** The same per queue-filter persona. Spec §9 1.1. */

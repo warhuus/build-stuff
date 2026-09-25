@@ -1,10 +1,10 @@
 /**
- * Wiring shared by the section-4 alert card loaders (spec §9 4.2–4.6): the loader envelope with the
- * fetch-level caveats (instructions §5 rule 5, lead decision D11) and the item-dim `itemsById` fetch.
- * No arithmetic: only flags, id collection and port / shared-loader calls.
+ * Wiring shared by the section-4 duration card loaders (spec §9 4.2–4.4): the item-dim `itemsById` fetch of
+ * the population's items (lead note L5) and the 4.3 / 4.4 body. No arithmetic: population selection is the
+ * pure `compute/durations` population function; this file only collects ids and calls shared loaders.
  */
 import { isItemDim } from "../breakdowns";
-import { mergeCaveats } from "../compute/caveats";
+import type { DurationAlert } from "../compute/durations";
 import { loadItemsByIds } from "../shared/itemsById";
 import { loadTouchedAlerts } from "../shared/touchedAlerts";
 import type { LoaderDeps } from "../source/MetricsSource";
@@ -18,40 +18,7 @@ import type {
   Paged,
   Window,
 } from "../types";
-
-/** Loader-level flags beyond the row cap. */
-export interface EnvelopeFlags {
-  /** A grouped port call returned exactly `config.MAX_GROUPS` rows (`isTruncatedByCap`). */
-  readonly truncated?: boolean;
-  /** 4.2 under a window key outside `config.NOT_WORKED_WINDOW_KEYS` (spec §9 4.2). */
-  readonly notWorkedWindowCap?: boolean;
-}
-
-/**
- * The loader envelope (instructions §5 rule 5; D11): `row-cap` when any fetch was capped, `truncated`
- * and `not-worked-window-cap` per `flags`; status `partial` on `row-cap` or `not-worked-window-cap`.
- * @param raw the card's raw data.
- * @param fetches every `Paged` result the loader used (null entries = fetch not made, skipped).
- * @param flags extra loader caveats.
- * @returns `{ raw, status, caveats }`, caveats de-duplicated in config order.
- */
-export function loaderEnvelope<R>(
-  raw: R,
-  fetches: readonly (Paged<unknown> | null)[],
-  flags: EnvelopeFlags = {},
-): LoaderOutput<R> {
-  const capped = fetches.some((p) => p !== null && p.capped);
-  const notWorkedCap = flags.notWorkedWindowCap === true;
-  return {
-    raw,
-    status: capped || notWorkedCap ? "partial" : "ok",
-    caveats: mergeCaveats(
-      capped ? ["row-cap"] : [],
-      flags.truncated === true ? ["truncated"] : [],
-      notWorkedCap ? ["not-worked-window-cap"] : [],
-    ),
-  };
-}
+import { loaderOutput } from "./loaderOutput";
 
 /**
  * The non-null salesOrderIds of alert rows (any order, duplicates allowed; `loadItemsByIds` de-duplicates).
@@ -78,31 +45,39 @@ export function itemsForDim(
   return breakdown !== null && isItemDim(breakdown) ? loadItemsByIds(ids, deps) : Promise.resolve(null);
 }
 
+/** How a 4.3 / 4.4 loader picks its population (spec §9 4.3–4.4): the pure compute population function. */
+export type PopulationOf = (facts: readonly AlertLifecycleRow[], window: Window) => readonly DurationAlert[];
+
+/** Inputs of `loadFactsDuration`. */
+export interface FactsDurationInput {
+  /** L2 window (4.3: the selected window; 4.4: `"now"`; D12). */
+  readonly factsWindow: Window;
+  /** Resolved selection window (goes into the raw and selects the population). */
+  readonly window: Window;
+  readonly filters: ItemFilters;
+  readonly breakdown: BreakdownDimension | null;
+  /** `raisedToFirstViewPopulation` (4.3) or `firstViewToClosurePopulation` (4.4). */
+  readonly populationOf: PopulationOf;
+}
+
 /**
- * 4.3 / 4.4 body (spec §9 4.3–4.4, D12): L2 over `factsWindow`, no not-worked fetch, items of every
- * fact's salesOrderId for an item dim. Population selection by window is left to derive.
- * @param factsWindow L2 window (4.3: the selected window; 4.4: `"now"`).
- * @param window resolved selection window (goes into the raw).
- * @param filters item filters.
- * @param breakdown validated breakdown or null.
+ * 4.3 / 4.4 body (spec §9 4.3–4.4, D12): L2 over `factsWindow`, no not-worked fetch and, for an item dim,
+ * `itemsById` of the POPULATION's salesOrderIds only (spec §9 4.2 "fetch the population's items"; lead
+ * note L5), the population chosen by `populationOf` (the same pure function the derive uses).
+ * @param input windows, filters, breakdown and population function.
  * @param deps loader dependencies.
  * @returns the `DurationRaw` envelope; `row-cap` + partial when L2 or itemsById was capped.
  */
-export async function loadFactsDuration(
-  factsWindow: Window,
-  window: Window,
-  filters: ItemFilters,
-  breakdown: BreakdownDimension | null,
-  deps: LoaderDeps,
-): Promise<LoaderOutput<DurationRaw>> {
-  const facts = await loadTouchedAlerts(factsWindow, filters, deps);
-  const items = await itemsForDim(breakdown, salesOrderIdsOf(facts.rows), deps);
+export async function loadFactsDuration(input: FactsDurationInput, deps: LoaderDeps): Promise<LoaderOutput<DurationRaw>> {
+  const facts = await loadTouchedAlerts(input.factsWindow, input.filters, deps);
+  const population = input.populationOf(facts.rows, input.window);
+  const items = await itemsForDim(input.breakdown, salesOrderIdsOf(population.map((alert) => alert.fact)), deps);
   const raw: DurationRaw = {
-    window,
-    dimension: breakdown,
+    window: input.window,
+    dimension: input.breakdown,
     facts: facts.rows,
     notWorked: null,
     items: items === null ? null : items.rows,
   };
-  return loaderEnvelope(raw, [facts, items]);
+  return loaderOutput(raw, [facts, items]);
 }

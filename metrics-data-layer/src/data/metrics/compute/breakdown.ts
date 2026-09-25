@@ -4,7 +4,7 @@
  */
 import type { MetricsConfig } from "../../../config/metrics";
 import type { BreakdownDimension, BreakdownResult, GroupCount } from "../types";
-import { safeDivide, sumBy } from "./stats";
+import { compareCodeUnits, safeDivide, sumBy } from "./stats";
 
 /**
  * Sort order of breakdown groups: count descending, then group name ascending (instructions §5 rule 11).
@@ -12,8 +12,7 @@ import { safeDivide, sumBy } from "./stats";
  */
 export function compareGroupCounts(a: GroupCount, b: GroupCount): number {
   if (a.count !== b.count) return b.count - a.count;
-  if (a.group === b.group) return 0;
-  return a.group < b.group ? -1 : 1;
+  return compareCodeUnits(a.group, b.group);
 }
 
 /** A sorted copy (`compareGroupCounts`) of `counts`. */
@@ -27,6 +26,15 @@ export function sortGroupCounts(counts: readonly GroupCount[]): GroupCount[] {
  */
 export function topGroups(counts: readonly GroupCount[], max: number): GroupCount[] {
   return sortGroupCounts(counts).slice(0, Math.max(0, max));
+}
+
+/**
+ * The groups with a count above 0 (spec §5 B2 "largest first" ranks real groups only; §9.0 Truncation:
+ * `truncated` only when top-N cuts real groups). Used before top-N wherever a candidate list can hold empty
+ * groups (itemFunnel item-view alert dims, userFunnel escalated, the alert view's 2.1 sums).
+ */
+export function nonEmptyGroups<G extends GroupCount>(counts: readonly G[]): G[] {
+  return counts.filter((entry) => entry.count > 0);
 }
 
 /**

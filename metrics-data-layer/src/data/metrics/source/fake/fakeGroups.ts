@@ -6,13 +6,16 @@
  */
 import { PLACEHOLDER } from "../../../../config/metrics";
 import type { MetricsConfig, VerdictDateProperty } from "../../../../config/metrics";
-import { compareGroupCounts } from "../../compute/breakdown";
-import type { CountValue, GroupCount, GroupCountValue, RangeCount, Window } from "../../types";
-import { toDateOnly } from "../../window";
+import { compareGroupCounts, groupRows } from "../../compute/breakdown";
+import { inVerdictWindow, passesGate, verdictOf } from "../../compute/otifOutcome";
+import type { CountValue, GroupCount, GroupCountValue, RangeCount, VerdictRow } from "../../types";
 import type { VerdictFilter } from "../../query/specs";
 import type { FixtureItem, FixtureVerdict } from "./fakeTypes";
 
-/** The `max` largest groups, count descending then name ascending (the fake's `$exactWithLimit`). */
+/**
+ * The `max` largest groups, count descending then name ascending (the fake's `$exactWithLimit`; same order as
+ * `compute/breakdown.topGroups`, kept generic so count+value groups keep their value).
+ */
 export function capGroups<G extends GroupCount>(groups: readonly G[], max: number): G[] {
   return [...groups].sort(compareGroupCounts).slice(0, Math.max(0, max));
 }
@@ -29,11 +32,7 @@ export function distinctByGroup<R>(
   valueOf: (row: R) => string | null,
   max: number,
 ): GroupCount[] {
-  const groups = new Map<string, R[]>();
-  for (const row of rows) {
-    const g = groupOf(row);
-    if (g !== null) groups.set(g, [...(groups.get(g) ?? []), row]);
-  }
+  const groups = groupRows(rows, groupOf);
   return capGroups([...groups].map(([group, members]) => ({ group, count: exactDistinct(members, valueOf) })), max);
 }
 
@@ -48,11 +47,7 @@ export function countValueByGroup(
   groupOf: (item: FixtureItem) => string | null,
   max: number,
 ): GroupCountValue[] {
-  const groups = new Map<string, FixtureItem[]>();
-  for (const item of items) {
-    const g = groupOf(item);
-    if (g !== null) groups.set(g, [...(groups.get(g) ?? []), item]);
-  }
+  const groups = groupRows(items, groupOf);
   return capGroups([...groups].map(([group, members]) => ({ group, ...countValueOf(members) })), max);
 }
 
@@ -71,22 +66,31 @@ export function verdictDateOf(row: FixtureVerdict, property: VerdictDateProperty
   return property === PLACEHOLDER ? null : row[property];
 }
 
-/** Spec §9 4.1 `dateIn(w)`: verdict date within the window on UTC calendar dates; "now" = no lower bound. */
-export function inVerdictWindow(date: string | null, w: Window): boolean {
-  if (date === null || date > toDateOnly(w.end)) return false;
-  return w.start === null || date >= toDateOnly(w.start);
+/**
+ * Maps a fixture verdict to the port row (spec §10 `VerdictRow`).
+ * @param v fixture row.
+ * @param config supplies `VERDICT_DATE_PROPERTY`.
+ * @returns the row; `verdictDate` = the chosen date property, null while it is the placeholder.
+ */
+export function verdictRowOf(v: FixtureVerdict, config: MetricsConfig): VerdictRow {
+  return {
+    otifOrderId: v.otifOrderId,
+    otifVerdict: v.otifVerdict,
+    critVerdict: v.critVerdict,
+    otifExclusion: v.otifExclusion,
+    critExclusion: v.critExclusion,
+    verdictDate: verdictDateOf(v, config.VERDICT_DATE_PROPERTY),
+  };
 }
 
 /**
  * Spec §9 4.1 step 1: rows whose mode gate = `EXCLUSION_GATE_PASS` and whose verdict date is in the window,
- * grouped by the mode's classification (nulls dropped), capped at `MAX_GROUPS`.
+ * grouped by the mode's classification (nulls dropped), capped at `MAX_GROUPS`. The gate, verdict and date
+ * rules are the derive's own (`compute/otifOutcome` `passesGate`, `verdictOf`, `inVerdictWindow`; D8).
  */
 export function verdictTotals(rows: readonly FixtureVerdict[], filter: VerdictFilter, config: MetricsConfig): GroupCount[] {
-  const otif = filter.mode === "otif";
-  const passing = rows.filter(
-    (r) =>
-      (otif ? r.otifExclusion : r.critExclusion) === config.EXCLUSION_GATE_PASS &&
-      inVerdictWindow(verdictDateOf(r, config.VERDICT_DATE_PROPERTY), filter.window),
-  );
-  return distinctByGroup(passing, (r) => (otif ? r.otifVerdict : r.critVerdict), (r) => r.otifOrderId, config.MAX_GROUPS);
+  const passing = rows
+    .map((r) => verdictRowOf(r, config))
+    .filter((r) => passesGate(r, filter.mode, config) && inVerdictWindow(r.verdictDate, filter.window));
+  return distinctByGroup(passing, (r) => verdictOf(r, filter.mode), (r) => r.otifOrderId, config.MAX_GROUPS);
 }

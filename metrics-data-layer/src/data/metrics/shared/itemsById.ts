@@ -3,9 +3,10 @@
  * wrapper over `MetricsSource.fetchItemsByIds` (card-specific id lists; the card's raw cache holds the
  * result). Id chunks and their limiter live in the source (Appendix A X3).
  */
+import { sortedDistinct } from "../compute/stats";
 import type { LoaderDeps } from "../source/MetricsSource";
 import type { ItemRow, Paged } from "../types";
-import { sortedDistinct, sourceCtxOf } from "./sourceCtx";
+import { sourceCtxOf } from "./sourceCtx";
 
 const NO_ITEMS: Paged<ItemRow> = { rows: [], capped: false };
 

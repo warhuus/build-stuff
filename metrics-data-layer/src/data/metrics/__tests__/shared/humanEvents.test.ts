@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { humanEvents } from "../../query/build";
 import { clearMetricsCache } from "../../shared/cache";
-import { humanEventsKey, loadHumanEvents } from "../../shared/humanEvents";
+import { loadHumanEvents } from "../../shared/humanEvents";
+import { memoKey } from "../../shared/memo";
 import { EMPTY_FILTERS } from "../../selection";
 import { AMER, callCount, fakeDeps, idsOf, win } from "./loaderDeps";
 
@@ -52,7 +53,7 @@ describe("loadHumanEvents (L1, spec §9.0.1)", () => {
   });
 
   it("memo key is window.key | filtersKey; the same key is fetched once", async () => {
-    expect(humanEventsKey(win(7), AMER)).toBe("L1|7|bl=;pl=;rg=AMER;pt=");
+    expect(memoKey(win(7), AMER)).toBe("7|bl=;pl=;rg=AMER;pt=");
     const deps = fakeDeps();
     await loadHumanEvents(win(7), AMER, deps);
     await loadHumanEvents(win(7), { ...AMER, region: ["AMER", "AMER"] }, deps);

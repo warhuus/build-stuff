@@ -31,17 +31,19 @@ interface Request<C extends CardId> {
 
 /**
  * The loading shape (instructions §7): status `loading`, the previous result's data, caveats and
- * `computedAt` kept (`[]` / `""` without one), the new selection's window, the load's progress if any.
+ * `computedAt` kept; without a previous result no data, `[]` caveats and `computedAt` = the request time
+ * (ISO, SPF-02); the new selection's window (resolved at the request time); the load's progress if any.
  */
 function loadingResult<C extends CardId>(
   previous: CardResult<C> | null,
   window: Window,
+  requestedAt: Date,
   progress: Progress | null,
 ): CardResult<C> {
   const base: CardResult<C> = {
     status: "loading",
     caveats: previous?.caveats ?? [],
-    computedAt: previous?.computedAt ?? "",
+    computedAt: previous?.computedAt ?? requestedAt.toISOString(),
     window,
   };
   const withData = previous?.data === undefined ? base : { ...base, data: previous.data };
@@ -60,13 +62,14 @@ function answers<C extends CardId>(loaded: Loaded<C> | null, req: Request<C>): l
 }
 
 /**
- * Runs `loadCard` for the request whenever it is not settled; aborts on key change and unmount; drops stale
- * responses with a per-instance monotonic request id.
+ * Runs `loadCard` for the request whenever it is not settled, with `now` = the request time; aborts on key
+ * change, environment change and unmount; drops stale responses with a per-instance monotonic request id.
  */
 function useCardLoad<C extends CardId>(
   req: Request<C>,
   needsLoad: boolean,
   env: MetricsEnvironment,
+  requestedAt: Date,
   onLoaded: (loaded: Loaded<C>) => void,
   onProgress: (p: { readonly request: number; readonly value: Progress }) => void,
 ): MutableRefObject<number> {
@@ -80,7 +83,7 @@ function useCardLoad<C extends CardId>(
       const report = (value: Progress): void => {
         if (id === requestId.current && !controller.signal.aborted) onProgress({ request: id, value });
       };
-      const opts = { source: env.source, config: env.config, now: env.now(), signal: controller.signal };
+      const opts = { source: env.source, config: env.config, now: requestedAt, signal: controller.signal };
       void loadCard(req.cardId, req.selection, req.breakdown, { ...opts, onProgress: report }).then((result) => {
         if (id !== requestId.current || controller.signal.aborted) return;
         onLoaded({ ...req, result });
@@ -125,18 +128,21 @@ export function useMetric<C extends CardId>(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `req` and `sel` are rebuilt every render; `deriveKey` + `version` identify them.
     [cardId, deriveKey, version, loaded, env],
   );
-  const requestId = useCardLoad(req, settled === null, env, setLoaded, setProgress);
+  // The request time: the load's `now` and, without a previous result, the loading `computedAt` (SPF-02).
+  const requestedAt = useMemo(
+    () => env.now(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one request time per raw key and cache version (what one load answers); `cardId` is part of `rawKey`.
+    [rawKey, version, env],
+  );
+  const requestId = useCardLoad(req, settled === null, env, requestedAt, setLoaded, setProgress);
   const current = progress !== null && progress.request === requestId.current ? progress.value : null;
-  const result = useMemo(
-    () =>
-      settled ??
-      loadingResult(
-        previous.current?.cardId === cardId ? previous.current.result : null,
-        resolveWindow(sel.window, env.now()),
-        current,
-      ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the loading shape changes only with the settled result, the key and progress; `previous` is a ref read at that moment.
-    [settled, cardId, deriveKey, current, env],
+  const result = useMemo(() => {
+    if (settled !== null) return settled;
+    const prev = previous.current?.cardId === cardId ? previous.current.result : null;
+    return loadingResult(prev, resolveWindow(sel.window, requestedAt), requestedAt, current);
+  },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the loading shape changes only with the settled result, the key, the request time and progress; `previous` is a ref read at that moment.
+    [settled, cardId, deriveKey, current, requestedAt],
   );
   useEffect(() => {
     if (result.status !== "loading") previous.current = { cardId, result };

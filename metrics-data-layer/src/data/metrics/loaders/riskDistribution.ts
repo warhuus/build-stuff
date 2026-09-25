@@ -5,13 +5,13 @@
  * grouped call per bucket (all 7, unscored via its where-clause). Every call is issued in parallel.
  * Unscored count/value, not worked = all − worked and every share are derive's job.
  */
-import { RISK_BUCKETS } from "../../../config/metricsCodes";
+import { SCORED_BUCKETS } from "../../../config/metrics";
+import { isItemDim } from "../breakdowns";
 import { itemsOfRisk, riskAll, riskBucket, riskNotDelayed, riskWorked } from "../query/buildRisk";
 import type { RiskSet } from "../query/specs";
 import { sourceCtxOf } from "../shared/sourceCtx";
 import type { Loader, MetricsSource, SourceCtx } from "../source/MetricsSource";
 import type {
-  BreakdownDimension,
   FetchedRiskBucket,
   GroupCountValue,
   ItemDim,
@@ -20,24 +20,21 @@ import type {
   RiskSideRaw,
 } from "../types";
 import { resolveWindow } from "../window";
-import { funnelLoaderOutput } from "./funnelLoaderOutput";
+import { loaderOutput } from "./loaderOutput";
 
 /** Item-dim groups of one side: one grouped `countItemsBy` per bucket (spec §9 3.1 `split(b, set, d)`). */
 type SideGroups = Readonly<Record<RiskBucketId, readonly GroupCountValue[]>>;
+
+/** The buckets fetched by a where-clause, in config order (unscored comes by subtraction, spec §9 3.1). */
+const FETCHED_BUCKETS: readonly FetchedRiskBucket[] = [...SCORED_BUCKETS, "delayed"];
 
 /**
  * Runs `fetch` for the 6 fetched buckets in parallel (spec §9 3.1 `value(b, set)`; unscored by subtraction).
  * @returns the results keyed by bucket.
  */
 async function perFetchedBucket<T>(fetch: (b: FetchedRiskBucket) => Promise<T>): Promise<Record<FetchedRiskBucket, T>> {
-  const [b15_30, b31_50, b51_70, b71_90, b91_100, delayed] = await Promise.all([
-    fetch("b15_30"),
-    fetch("b31_50"),
-    fetch("b51_70"),
-    fetch("b71_90"),
-    fetch("b91_100"),
-    fetch("delayed"),
-  ]);
+  const results = await Promise.all(FETCHED_BUCKETS.map(fetch));
+  const [b15_30, b31_50, b51_70, b71_90, b91_100, delayed] = results;
   return { b15_30, b31_50, b51_70, b71_90, b91_100, delayed };
 }
 
@@ -71,12 +68,12 @@ async function sideTotals(set: RiskSet, source: MetricsSource, ctx: SourceCtx): 
  * @param selection `window` (worked side only; "now" = all-time, Appendix A W3) and `filters` (both sides).
  * @param breakdown an item dim (validated by loadCard) or null; other dims are treated as null.
  * @param deps source, now, signal, config (`RISK_RANGES`, `MAX_GROUPS`).
- * @returns raw `{ window, dimension, all, worked }`; caveat `truncated` when any grouped call returned exactly
- * `MAX_GROUPS` rows. Aggregates only, so status is always "ok". Rejects on source error or abort.
+ * @returns raw `{ window, dimension, all, worked }`; aggregates only, so status "ok" and no caveats (`truncated`
+ * is derive's, MOD-02). Rejects on source error or abort.
  */
 export const loadRiskDistribution: Loader<RiskDistributionRaw> = async (selection, breakdown, deps) => {
   const window = resolveWindow(selection.window, deps.now);
-  const dimension = itemDimOf(breakdown);
+  const dimension = breakdown !== null && isItemDim(breakdown) ? breakdown : null;
   const ctx = sourceCtxOf(deps, deps.signal);
   const sets = [riskAll(selection.filters), riskWorked(window, selection.filters)] as const;
   const [allTotals, workedTotals, allGroups, workedGroups] = await Promise.all([
@@ -91,19 +88,5 @@ export const loadRiskDistribution: Loader<RiskDistributionRaw> = async (selectio
     all: { ...allTotals, groups: allGroups },
     worked: { ...workedTotals, groups: workedGroups },
   };
-  const grouped = [allGroups, workedGroups].flatMap((g) => (g === null ? [] : RISK_BUCKETS.map((b) => g[b])));
-  return funnelLoaderOutput(raw, { capped: false, grouped }, deps.config);
+  return loaderOutput(raw);
 };
-
-/** The breakdown as an item dim (3.1 allows item dims only; registry in `breakdowns.ts`). */
-function itemDimOf(breakdown: BreakdownDimension | null): ItemDim | null {
-  switch (breakdown) {
-    case "businessLine":
-    case "productLine":
-    case "region":
-    case "plant":
-      return breakdown;
-    default:
-      return null;
-  }
-}

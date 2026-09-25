@@ -5,22 +5,12 @@
  * semaphore (Appendix A X3). Cleared by `clearMetricsCache()`.
  */
 import { humanEvents } from "../query/build";
-import { filtersKey } from "../selection";
 import type { LoaderDeps } from "../source/MetricsSource";
 import type { AlertEventRow, ItemFilters, Paged, Window } from "../types";
-import { createSharedMemo } from "./memo";
+import { createSharedMemo, memoKey } from "./memo";
 import { sourceCtxOf } from "./sourceCtx";
 
 const memo = createSharedMemo<string, Paged<AlertEventRow>>();
-
-/**
- * L1 memo key. Spec §11: `window.key | hash(filters)`.
- * @param window resolved window (only its key is used).
- * @param filters item filters.
- * @returns `L1|<window.key>|<filtersKey>`.
- */
-export const humanEventsKey = (window: Window, filters: ItemFilters): string =>
-  `L1|${window.key}|${filtersKey(filters)}`;
 
 /**
  * L1: human events (viewed OR action OR write-back, spec §4) with `eventTimestamp` in `window`.
@@ -34,7 +24,7 @@ export const humanEventsKey = (window: Window, filters: ItemFilters): string =>
  */
 export function loadHumanEvents(window: Window, filters: ItemFilters, deps: LoaderDeps): Promise<Paged<AlertEventRow>> {
   return memo.get(
-    humanEventsKey(window, filters),
+    memoKey(window, filters),
     (signal) => deps.source.fetchEvents(humanEvents(window, filters), sourceCtxOf(deps, signal)),
     deps.signal,
   );

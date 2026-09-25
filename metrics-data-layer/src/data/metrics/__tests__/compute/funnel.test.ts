@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  deriveStages,
+  deriveFunnel,
   firstOkStageId,
   funnelSeries,
   itemAmounts,
@@ -20,23 +20,23 @@ const itemStages: FunnelStageRaw[] = [
   okStage("2.4", { count: 0, valueUsd: 0 }, ["low-volume"], outsidePathOf("2.4", { count: 1, valueUsd: 50 })),
 ];
 
-describe("deriveStages (spec §9.0, Appendix A F2–F3, B8)", () => {
+describe("deriveFunnel (spec §9.0, Appendix A F2–F3, B8)", () => {
   it("count unit: pctPrev vs previous, pctFirst vs 2.0, trackValue = previous, null on the first", () => {
-    const { stages, caveats } = deriveStages(itemStages, "count");
+    const { stages, caveats } = deriveFunnel(itemStages, "count");
     expect(stages.map((s) => s.pctPrev)).toEqual([null, 0.5, 0.4, 0.5, 0]);
     expect(stages.map((s) => s.pctFirst)).toEqual([1, 0.5, 0.2, 0.1, 0]);
     expect(stages.map((s) => s.trackValue)).toEqual([null, 100, 50, 20, 10]);
     expect(caveats).toEqual([]);
   });
   it("value unit gives different percentages from the same raw numbers", () => {
-    const { stages } = deriveStages(itemStages, "valueUsd");
+    const { stages } = deriveFunnel(itemStages, "valueUsd");
     expect(stages.map((s) => s.pctPrev)).toEqual([null, 0.8, 0.25, 0.8, 0]);
     expect(stages.map((s) => s.pctFirst)).toEqual([1, 0.8, 0.2, 0.16, 0]);
     expect(stages[1].trackValue).toBe(10_000);
   });
   it("zero previous stage → null pctPrev; zero first → null pctFirst", () => {
     const stages = [okStage("2.0", { count: 0, valueUsd: 0 }), okStage("2.1", { count: 0, valueUsd: 0 })];
-    const derived = deriveStages(stages, "count").stages;
+    const derived = deriveFunnel(stages, "count").stages;
     expect(derived[1].pctPrev).toBeNull();
     expect(derived[1].pctFirst).toBeNull();
     expect(derived[1].trackValue).toBe(0);
@@ -47,7 +47,7 @@ describe("deriveStages (spec §9.0, Appendix A F2–F3, B8)", () => {
       okStage("1.1", { count: 40, valueUsd: null }),
       okStage("1.2", { count: 10, valueUsd: null }, ["id-space-differs"]),
     ];
-    const { stages: derived, caveats } = deriveStages(stages, "valueUsd");
+    const { stages: derived, caveats } = deriveFunnel(stages, "valueUsd");
     expect(derived[0]).toMatchObject({ availability: "no-source", count: null, pctPrev: null, pctFirst: null, trackValue: null });
     expect(derived[1]).toMatchObject({ pctPrev: null, pctFirst: 1, trackValue: null });
     expect(derived[2]).toMatchObject({ pctPrev: 0.25, pctFirst: 0.25, trackValue: 40 });
@@ -56,18 +56,18 @@ describe("deriveStages (spec §9.0, Appendix A F2–F3, B8)", () => {
   });
   it("not-applicable stages in the middle are skipped as previous", () => {
     const stages = [okStage("2.1", { count: 50, valueUsd: null }), notApplicableStage("2.2"), okStage("2.3", { count: 5, valueUsd: null })];
-    const derived = deriveStages(stages, "count").stages;
+    const derived = deriveFunnel(stages, "count").stages;
     expect(derived[1]).toMatchObject({ availability: "not-applicable", pctPrev: null, trackValue: null });
     expect(derived[2]).toMatchObject({ pctPrev: 0.1, trackValue: 50 });
   });
   it("a null ok-stage count (defensive) gives null percentages", () => {
     const nullStage: FunnelStageRaw = { ...okStage("2.1", { count: 0, valueUsd: 0 }), count: null };
-    const derived = deriveStages([okStage("2.0", { count: 10, valueUsd: 1 }), nullStage, okStage("2.2", { count: 5, valueUsd: 1 })], "count").stages;
+    const derived = deriveFunnel([okStage("2.0", { count: 10, valueUsd: 1 }), nullStage, okStage("2.2", { count: 5, valueUsd: 1 })], "count").stages;
     expect(derived[1].pctPrev).toBeNull();
     expect(derived[2]).toMatchObject({ pctPrev: null, trackValue: null, pctFirst: 0.5 });
   });
   it("no ok stage at all → every derived field null", () => {
-    const derived = deriveStages([notApplicableStage("2.0")], "count");
+    const derived = deriveFunnel([notApplicableStage("2.0")], "count");
     expect(derived.stages[0].pctFirst).toBeNull();
   });
 });

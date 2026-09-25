@@ -41,10 +41,19 @@ describe("paged fetches (spec §9.0 fetchAllPages)", () => {
     expect(t.requests).toHaveLength(3);
   });
 
-  it("is not capped when the last page ends exactly at ROW_CAP", async () => {
+  it("is capped when the rows reach ROW_CAP exactly, even on the last page (spec §9.0 rows.length >= ROW_CAP; L1)", async () => {
     const t = setup();
     t.handlers.load = pagedEvents(2, 2);
     const out = await t.source.fetchEvents({ kind: "all" }, makeCtx({ PAGE_SIZE: 2, ROW_CAP: 4 }));
+    expect(out).toMatchObject({ capped: true });
+    expect(out.rows).toHaveLength(4);
+    expect(t.requests).toHaveLength(2);
+  });
+
+  it("is not capped below ROW_CAP", async () => {
+    const t = setup();
+    t.handlers.load = pagedEvents(2, 2);
+    const out = await t.source.fetchEvents({ kind: "all" }, makeCtx({ PAGE_SIZE: 2, ROW_CAP: 5 }));
     expect(out).toMatchObject({ capped: false });
     expect(out.rows).toHaveLength(4);
   });

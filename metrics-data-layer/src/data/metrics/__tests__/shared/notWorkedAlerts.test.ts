@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { closedNotOpenNow, openedEventsOfItemsOf } from "../../query/build";
 import { clearMetricsCache } from "../../shared/cache";
-import { loadNotWorkedAlerts, notWorkedAlertsKey } from "../../shared/notWorkedAlerts";
+import { loadNotWorkedAlerts } from "../../shared/notWorkedAlerts";
+import { memoKey } from "../../shared/memo";
 import { EMPTY_FILTERS } from "../../selection";
 import { fixtureTime as t } from "../../source/fake/fixtureAlerts";
 import type { AlertLifecycleRow } from "../../types";
@@ -57,7 +58,7 @@ describe("loadNotWorkedAlerts (decision D2, spec §9 4.2)", () => {
   });
 
   it("memoised per window.key | filtersKey; capped propagates", async () => {
-    expect(notWorkedAlertsKey(win(14), AMER)).toBe("NW|14|bl=;pl=;rg=AMER;pt=");
+    expect(memoKey(win(14), AMER)).toBe("14|bl=;pl=;rg=AMER;pt=");
     const deps = fakeDeps();
     await Promise.all([loadNotWorkedAlerts(win(7), EMPTY_FILTERS, deps), loadNotWorkedAlerts(win(7), EMPTY_FILTERS, deps)]);
     expect(callCount(deps.source, "fetchEvents")).toBe(2);

@@ -7,8 +7,7 @@ import {
   itemFiltersWhere,
   openAlertWhere,
   openInWindowWhere,
-  riskWhere,
-  toDateOnly,
+  compileRiskCondition,
   tsIn,
   verdictDateIn,
   verdictGate,
@@ -85,9 +84,6 @@ describe("item clauses", () => {
     });
     expect(openInWindowWhere(WNOW)).toEqual({ isOpen: { $eq: true } });
   });
-  it("toDateOnly takes the UTC calendar date", () => {
-    expect(toDateOnly("2026-09-24T23:59:59.999Z")).toBe("2026-09-24");
-  });
 });
 
 describe("open-alert, risk, verdict and app-usage clauses", () => {
@@ -98,15 +94,15 @@ describe("open-alert, risk, verdict and app-usage clauses", () => {
   });
   it("risk conditions per spec §9 3.1", () => {
     const NOT_DELAYED = { $not: { otifStatus: { $eq: "Delayed" } } };
-    expect(riskWhere({ kind: "notDelayed" }, TEST_CONFIG)).toEqual(NOT_DELAYED);
-    expect(riskWhere({ kind: "bucket", bucket: "delayed" }, TEST_CONFIG)).toEqual({ otifStatus: { $eq: "Delayed" } });
-    expect(riskWhere({ kind: "bucket", bucket: "unscored" }, TEST_CONFIG)).toEqual({
+    expect(compileRiskCondition({ kind: "notDelayed" }, TEST_CONFIG)).toEqual(NOT_DELAYED);
+    expect(compileRiskCondition({ kind: "bucket", bucket: "delayed" }, TEST_CONFIG)).toEqual({ otifStatus: { $eq: "Delayed" } });
+    expect(compileRiskCondition({ kind: "bucket", bucket: "unscored" }, TEST_CONFIG)).toEqual({
       $and: [NOT_DELAYED, { otifScore: { $isNull: true } }],
     });
-    expect(riskWhere({ kind: "bucket", bucket: "b15_30" }, TEST_CONFIG)).toEqual({
+    expect(compileRiskCondition({ kind: "bucket", bucket: "b15_30" }, TEST_CONFIG)).toEqual({
       $and: [NOT_DELAYED, { otifScore: { $gte: 0 } }, { otifScore: { $lt: 31 } }],
     });
-    expect(riskWhere({ kind: "bucket", bucket: "b91_100" }, TEST_CONFIG)).toEqual({
+    expect(compileRiskCondition({ kind: "bucket", bucket: "b91_100" }, TEST_CONFIG)).toEqual({
       $and: [NOT_DELAYED, { otifScore: { $gte: 91 } }, { otifScore: { $lt: 101 } }],
     });
   });

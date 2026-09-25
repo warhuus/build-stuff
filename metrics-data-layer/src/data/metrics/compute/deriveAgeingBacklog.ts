@@ -3,27 +3,17 @@
  * `selection.ageingThresholdDays`, applied here, so changing it never refetches.
  */
 import { METRICS_CONFIG } from "../../../config/metrics";
-import type { MetricsConfig } from "../../../config/metrics";
-import type { AgeingBacklog, AgeingBacklogRaw, BreakdownDimension, Derive, ItemRow } from "../types";
-import { isAlertDim, isItemDim } from "../breakdowns";
+import type { AgeingBacklog, AgeingBacklogRaw, BreakdownResult, Derive } from "../types";
+import { isAlertDim } from "../breakdowns";
 import { ageingBacklog, agedAlerts, raisedAtByAlert } from "./ageing";
 import type { AgedAlert } from "./ageing";
 import { mergeCaveats } from "./caveats";
 import { additiveRowBreakdown, caveatsIf, truncationCaveats } from "./deriveCommon";
-import { itemValueOf, itemsById, openAlertDimValue } from "./dimValues";
-
-/** Group key of an aged alert: alert dims from the open alert row, item dims from its item (spec §9 4.5). */
-function agedKeyOf(
-  dim: BreakdownDimension,
-  items: ReadonlyMap<string, ItemRow>,
-  config: MetricsConfig,
-): (entry: AgedAlert) => string | null {
-  if (isItemDim(dim)) return (entry) => itemValueOf(entry.alert.salesOrderId, items, dim);
-  return (entry) => openAlertDimValue(entry.alert, dim, config);
-}
+import { itemsById, openAlertKeyOf } from "./dimValues";
 
 /**
- * 4.5 derive (spec §9 4.5): total = `ageingBacklog` of every open alert with N = selection
+ * 4.5 derive (spec §9 4.5): group keys from `openAlertKeyOf` (alert dims from the open-alert row, item dims
+ * from its item); total = `ageingBacklog` of every open alert with N = selection
  * `ageingThresholdDays`; breakdown additive on alert counts (top-N by open-alert count, `other` = alerts
  * outside the shown groups), each group an `AgeingBacklog` of its alerts and their items.
  * Caveats: `no-target-property` (always); `opened-events-since-pipeline-start` when unknownAge > 0;
@@ -40,8 +30,11 @@ export const deriveAgeingBacklog: Derive<AgeingBacklogRaw, AgeingBacklog> = (
   const dataOf = (rows: readonly AgedAlert[]): AgeingBacklog =>
     ageingBacklog({ aged: rows, items, asOf: raw.asOf, thresholdDays: selection.ageingThresholdDays }, config);
   const dimension = raw.dimension;
-  const breakdown =
-    dimension === null ? null : additiveRowBreakdown(aged, dimension, agedKeyOf(dimension, items, config), dataOf, config);
+  let breakdown: BreakdownResult<AgeingBacklog> | null = null;
+  if (dimension !== null) {
+    const alertKey = openAlertKeyOf(dimension, items, config);
+    breakdown = additiveRowBreakdown(aged, dimension, (entry) => alertKey(entry.alert), dataOf, config);
+  }
   const total = dataOf(aged);
   return {
     data: { total, breakdown },

@@ -7,7 +7,6 @@ import {
   bucketOf,
   bucketOfRangeStart,
   bucketRows,
-  emptyBucketAmounts,
   groupTotalsAcrossBuckets,
   rangesFromConfig,
   riskSideTotals,
@@ -18,6 +17,8 @@ import type { BucketRow, RiskSideRaw } from "../../types";
 
 const C = METRICS_CONFIG;
 const cv = (count: number, valueUsd: number) => ({ count, valueUsd });
+const Z = cv(0, 0);
+const emptyBucketAmounts = () => ({ unscored: Z, b15_30: Z, b31_50: Z, b51_70: Z, b71_90: Z, b91_100: Z, delayed: Z });
 
 describe("bucketOf (spec §9 3.1, §13 Risk buckets)", () => {
   it("null score → unscored", () => {

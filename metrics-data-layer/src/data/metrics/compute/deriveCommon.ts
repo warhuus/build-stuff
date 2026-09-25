@@ -44,12 +44,13 @@ export function additiveRowBreakdown<R, T>(
   dataOf: (rows: readonly R[]) => T,
   config: MetricsConfig,
 ): BreakdownResult<T> {
+  const groups = groupRows(rows, keyOf);
   return buildBreakdown(
     {
       dimension,
       additive: true,
-      ranking: groupCountsOf(groupRows(rows, keyOf)),
-      dataOf: (group) => dataOf(rows.filter((row) => keyOf(row) === group)),
+      ranking: groupCountsOf(groups),
+      dataOf: (group) => dataOf(groups.get(group) ?? []),
       otherOf: (shown) => dataOf(rowsOutside(rows, keyOf, shown)),
     },
     config,

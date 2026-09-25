@@ -12,7 +12,8 @@ import { integrationBlock, stubBlocked } from "./loaders/blocked";
 import { cacheKey, normalizeSelection } from "./selection";
 import { type CacheEntry, getCached, getOrLoad } from "./shared/cache";
 import { appSemaphore } from "./shared/concurrency";
-import { toErrorResult } from "./shared/errors";
+import { abortError, isAbortError, toErrorResult } from "./shared/errors";
+import { withCallProgress } from "./shared/sourceCtx";
 import type { MetricsSource } from "./source/MetricsSource";
 import type { BreakdownDimension, CardData, CardId, CardOutput, CardRaw, MetricResult, Progress, Selection } from "./types";
 import { resolveWindow } from "./window";
@@ -23,7 +24,8 @@ export type CardResult<C extends CardId> = MetricResult<CardData<CardOutput[C]>>
 /**
  * Options of `loadCard` (instructions §7). `now` defaults to the current time (window end, `computedAt`);
  * `config` defaults to `METRICS_CONFIG`; `signal` aborts this caller only (a shared load continues while
- * another caller waits for it); `onProgress` receives the cumulative rows loaded by this load (D24).
+ * another caller waits for it); `onProgress` receives the running total of rows loaded by this load: the sum
+ * over every port call it made (D24; a load joined from another caller reports nothing).
  */
 export interface LoadCardOptions {
   readonly source: MetricsSource;
@@ -93,6 +95,17 @@ function settle<C extends CardId>(
 }
 
 /**
+ * The error result of a failed load or derive (TYP-07): any abort reads `aborted`, whatever raised it.
+ * @param e the thrown value.
+ * @param sel normalised selection (its window is resolved at `now`).
+ * @param now time of the failure (`computedAt`).
+ * @returns `status: "error"` result.
+ */
+function failed<T>(e: unknown, sel: Selection, now: Date): MetricResult<T> {
+  return toErrorResult(isAbortError(e) ? abortError() : e, resolveWindow(sel.window, now), now.toISOString());
+}
+
+/**
  * The synchronous path (spec §11 "a cache hit returns synchronously"): the precheck result, or the cached
  * raw data derived for this selection. Never throws (a failing derive → `status: "error"`).
  * @param cardId card.
@@ -117,48 +130,48 @@ export function peekCard<C extends CardId>(
   try {
     return settle(cardId, entry, sel, config, undefined);
   } catch (e: unknown) {
-    return toErrorResult(e, resolveWindow(sel.window, now), now.toISOString());
+    return failed(e, sel, now);
   }
 }
 
-/** Sums per-fetch cumulative progress reports into one card total (D24). */
-interface ProgressSum {
-  readonly report: (p: Progress) => void;
+/** The running progress total of one `loadCard` call (D24, MOD-01). */
+interface ProgressTotal {
+  /** Adds rows reported by one port call (a delta from `withCallProgress`). */
+  readonly add: (rows: number) => void;
+  /** The total so far; undefined until the first report. */
   readonly last: () => Progress | undefined;
 }
 
 /**
- * D24: the port reports cumulative `loaded` per fetch, interleaved when fetches run in parallel, without a
- * fetch id. Each report continues the fetch whose last value is the largest one below it; a report not
- * above any known fetch starts a new fetch. The card total is the sum of every fetch's last value.
- * @param sink the caller's callback (receives the total after each report), optional.
- * @returns the reporter to hand to the loader and an accessor of the last total.
+ * Keeps the card's running total: `total += delta` per report, forwarded to `sink` while `signal` is not
+ * aborted.
+ * @param sink the caller's callback (receives the cumulative total), optional.
+ * @param signal the caller's signal, optional; after abort nothing is forwarded.
+ * @returns the adder and an accessor of the last total.
  */
-export function createProgressSum(sink: ((p: Progress) => void) | undefined): ProgressSum {
-  const fetches: number[] = [];
+function progressTotal(sink: ((p: Progress) => void) | undefined, signal: AbortSignal | undefined): ProgressTotal {
+  let total = 0;
   let latest: Progress | undefined;
-  const report = (p: Progress): void => {
-    let best = -1;
-    fetches.forEach((v, i) => {
-      if (v < p.loaded && (best < 0 || v > fetches[best])) best = i;
-    });
-    if (best < 0) fetches.push(p.loaded);
-    else fetches[best] = p.loaded;
-    latest = { loaded: fetches.reduce((a, b) => a + b, 0) };
-    sink?.(latest);
+  const add = (rows: number): void => {
+    total += rows;
+    latest = { loaded: total };
+    if (signal?.aborted !== true) sink?.(latest);
   };
-  return { report, last: () => latest };
+  return { add, last: () => latest };
 }
 
 /**
  * Loads one card (instructions §7, D13): normalise the selection; precheck (no calls); otherwise the cached
  * raw data or one shared load per raw cache key (spec §11) run inside the app semaphore (4 slots, X3), then
- * derive. Never throws: errors and aborts become `status: "error"` with a message.
+ * derive. Never throws: errors become `status: "error"` with the failure's message; an abort (the caller's
+ * signal, or any `AbortError` from the source) becomes `status: "error"` with the message `aborted` (TYP-07).
+ * Progress (D24, MOD-01): every port call gets its own ctx (`withCallProgress`) reporting deltas, summed here.
  * @param cardId card; the result type follows it.
  * @param selection selection (invalid fields fall back to defaults).
  * @param breakdown breakdown dimension or null.
  * @param opts source, optional now / signal / config / onProgress.
- * @returns `MetricResult<CardData<CardOutput[C]>>`; `progress` = last cumulative total reported by this load.
+ * @returns `MetricResult<CardData<CardOutput[C]>>`; `progress` = total rows reported by this load (absent on a
+ * cache hit or when nothing was reported).
  */
 export async function loadCard<C extends CardId>(
   cardId: C,
@@ -171,7 +184,8 @@ export async function loadCard<C extends CardId>(
   const sel = normalizeSelection(selection);
   const pre = precheckCard(cardId, sel, breakdown, config, now);
   if (pre !== null) return pre;
-  const progress = createProgressSum(opts.onProgress);
+  const progress = progressTotal(opts.onProgress, opts.signal);
+  const source = withCallProgress(opts.source, progress.add);
   const load = CARD_IMPL[cardId].load;
   try {
     const entry = await getOrLoad(
@@ -179,7 +193,7 @@ export async function loadCard<C extends CardId>(
       cacheKey(cardId, sel, breakdown),
       (signal) =>
         appSemaphore.run(
-          () => load(sel, breakdown, { source: opts.source, now, signal, onProgress: progress.report, config }),
+          () => load(sel, breakdown, { source, now, signal, config }),
           signal,
         ),
       now,
@@ -187,6 +201,6 @@ export async function loadCard<C extends CardId>(
     );
     return settle(cardId, entry, sel, config, progress.last());
   } catch (e: unknown) {
-    return toErrorResult(e, resolveWindow(sel.window, now), now.toISOString());
+    return failed(e, sel, now);
   }
 }

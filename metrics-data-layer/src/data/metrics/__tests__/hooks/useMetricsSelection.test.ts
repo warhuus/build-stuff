@@ -62,3 +62,32 @@ describe("useMetricsSelection (instructions §7)", () => {
     expect(result.current.state[0]).toBe(kept);
   });
 });
+
+describe("useMetricsSelection: updaters queue (TYP-02)", () => {
+  it("two updaters in one act keep both changes", () => {
+    const { result } = render("/metrics?tab=x&w=30");
+    act(() => {
+      result.current.state[1]((s) => ({ ...s, window: 7 }));
+      result.current.state[1]((s) => ({ ...s, unit: "valueUsd" }));
+    });
+    expect(result.current.state[0]).toMatchObject({ window: 7, unit: "valueUsd" });
+    expect(result.current.location.search).toBe("?tab=x&w=7&u=valueUsd");
+  });
+
+  it("an updater after a full selection sees that selection", () => {
+    const { result } = render("/");
+    act(() => {
+      result.current.state[1]({ ...DEFAULT_SELECTION, otifMode: "crit" });
+      result.current.state[1]((s) => ({ ...s, ageingThresholdDays: 14 }));
+    });
+    expect(result.current.state[0]).toMatchObject({ otifMode: "crit", ageingThresholdDays: 14 });
+  });
+
+  it("follows URL changes made elsewhere", () => {
+    const { result } = render("/?w=7");
+    act(() => result.current.state[1]((s) => ({ ...s, unit: "valueUsd" })));
+    act(() => result.current.state[1](DEFAULT_SELECTION));
+    act(() => result.current.state[1]((s) => ({ ...s, window: 14 })));
+    expect(result.current.state[0]).toEqual({ ...DEFAULT_SELECTION, window: 14 });
+  });
+});

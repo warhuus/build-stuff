@@ -5,7 +5,7 @@ import { loadOpenAlertItems, loadOpenAlertOpenedEvents, loadOpenAlerts } from ".
 import type { Loader } from "../source/MetricsSource";
 import type { AgeingBacklogRaw } from "../types";
 import { resolveWindow } from "../window";
-import { loaderEnvelope } from "./alertCardWiring";
+import { loaderOutput } from "./loaderOutput";
 
 /**
  * 4.5 loader: the three L3 fetches in parallel (open alerts, their opened events, their items; item
@@ -31,5 +31,5 @@ export const loadAgeingBacklog: Loader<AgeingBacklogRaw> = async (selection, bre
     openedEvents: opened.rows,
     items: items.rows,
   };
-  return loaderEnvelope(raw, [alerts, opened, items]);
+  return loaderOutput(raw, [alerts, opened, items]);
 };

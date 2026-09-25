@@ -7,7 +7,6 @@ import {
   alertFactsOf,
   attrsEventOf,
   closureGroupOf,
-  groupEventsByAlert,
 } from "../../compute/alertLifecycle";
 import type { AlertEventRow } from "../../types";
 
@@ -183,18 +182,12 @@ describe("closureGroupOf (spec §9 4.6)", () => {
   });
 });
 
-describe("groupEventsByAlert / alertFactsForIds", () => {
+describe("alertFactsForIds", () => {
   const rows = [
     ev("opened", T(1), { riskAlertId: "B" }),
     ev("opened", T(2), { riskAlertId: "A" }),
     ev("closed", T(3), { riskAlertId: "B" }),
   ];
-  it("groups by riskAlertId in first-appearance order", () => {
-    const grouped = groupEventsByAlert(rows);
-    expect([...grouped.keys()]).toEqual(["B", "A"]);
-    expect(grouped.get("B")).toEqual([rows[0], rows[2]]);
-    expect(groupEventsByAlert([]).size).toBe(0);
-  });
   it("builds facts per id, de-duplicated, open-now from the set, missing ids empty", () => {
     const facts = alertFactsForIds(["B", "A", "B", "Z"], rows, new Set(["A"]), C);
     expect(facts.map((f) => f.riskAlertId)).toEqual(["B", "A", "Z"]);

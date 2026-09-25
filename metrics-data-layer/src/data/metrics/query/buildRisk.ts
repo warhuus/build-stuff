@@ -2,7 +2,8 @@
  * riskDistribution spec builders (spec §9 3.1). Pure; built on the primitives of `build.ts`.
  */
 import type { ItemFilters, RiskBucketId, Window } from "../types";
-import { allItems, hasItemFilters, itemsWithEvent, withItemFilters } from "./build";
+import { hasFilters } from "../selection";
+import { allItems, itemsWithEvent, withItemFilters } from "./build";
 import type { ItemSet, RiskCondition, RiskSet } from "./specs";
 
 /**
@@ -10,7 +11,7 @@ import type { ItemSet, RiskCondition, RiskSet } from "./specs";
  * items (pivot `otifEvaluation`).
  */
 export const riskAll = (f: ItemFilters): RiskSet =>
-  hasItemFilters(f) ? { kind: "ofItems", items: withItemFilters(allItems, f) } : { kind: "all" };
+  hasFilters(f) ? { kind: "ofItems", items: withItemFilters(allItems, f) } : { kind: "all" };
 
 /**
  * Spec §9 3.1 `soeWorked`: `riskAll(f)` ∩ evaluations of items with a human event in `w`

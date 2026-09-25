@@ -87,7 +87,9 @@ export function setCached<C extends CardId>(
  * @param key raw cache key.
  * @param load the loader; receives the shared run's signal (a zero-argument function is fine too).
  * @param now time of computation (the entry's `computedAt`).
- * @param signal this caller's signal; its abort rejects this caller with an abort error.
+ * @param signal this caller's signal, optional; its abort rejects this caller with an abort error (the run goes
+ * on while another caller waits). Absent (undefined): this caller never aborts and pins the run, which is
+ * then never abandoned.
  * @returns the entry (the cached one on a hit).
  */
 export function getOrLoad<C extends CardId>(

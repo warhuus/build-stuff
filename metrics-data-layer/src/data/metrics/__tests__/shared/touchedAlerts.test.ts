@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { touchedEventsChain, touchedOpenAlerts } from "../../query/build";
 import { clearMetricsCache } from "../../shared/cache";
-import { loadTouchedAlerts, touchedAlertsKey } from "../../shared/touchedAlerts";
+import { loadTouchedAlerts } from "../../shared/touchedAlerts";
+import { memoKey } from "../../shared/memo";
 import { EMPTY_FILTERS } from "../../selection";
 import { fixtureTime as t } from "../../source/fake/fixtureAlerts";
 import type { AlertLifecycleRow } from "../../types";
@@ -102,6 +103,6 @@ describe("loadTouchedAlerts (L2, spec §9.0.1 L2, W4, W6)", () => {
   });
 
   it("memo key is window.key | filtersKey", async () => {
-    expect(touchedAlertsKey(win("now"), EMPTY_FILTERS)).toBe("L2|now|bl=;pl=;rg=;pt=");
+    expect(memoKey(win("now"), EMPTY_FILTERS)).toBe("now|bl=;pl=;rg=;pt=");
   });
 });

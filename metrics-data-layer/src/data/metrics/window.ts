@@ -40,6 +40,16 @@ export function toDateOnly(iso: string): string {
 }
 
 /**
+ * UTC calendar date of a date-only or timestamp value, tolerant of bad input (spec §9 4.1 verdict dates).
+ * @param value `YYYY-MM-DD` or an ISO-8601 timestamp; null allowed.
+ * @returns `YYYY-MM-DD` (`toDateOnly`); `null` when `value` is null or unparsable.
+ */
+export function dateOnlyOrNull(value: string | null): string | null {
+  if (value === null || Number.isNaN(Date.parse(value))) return null;
+  return toDateOnly(value);
+}
+
+/**
  * Whether a timestamp lies in a window, both bounds inclusive (`start ≤ ts ≤ end`).
  * @param ts ISO-8601 timestamp; `null` or unparsable → false.
  * @param window resolved window; `start: null` means no lower bound.

@@ -5,10 +5,9 @@
  * Never acquires the app semaphore (Appendix A X3).
  */
 import { l3Items, l3OpenAlerts, l3OpenedEvents } from "../query/build";
-import { filtersKey } from "../selection";
 import type { LoaderDeps } from "../source/MetricsSource";
 import type { AlertEventRow, ItemFilters, ItemRow, OpenAlertRow, Paged } from "../types";
-import { createSharedMemo } from "./memo";
+import { createSharedMemo, memoKey } from "./memo";
 import { sourceCtxOf } from "./sourceCtx";
 
 const alertsMemo = createSharedMemo<string, Paged<OpenAlertRow>>();
@@ -23,7 +22,7 @@ const itemsMemo = createSharedMemo<string, Paged<ItemRow>>();
  */
 export function loadOpenAlerts(filters: ItemFilters, deps: LoaderDeps): Promise<Paged<OpenAlertRow>> {
   return alertsMemo.get(
-    `L3a|${filtersKey(filters)}`,
+    memoKey(null, filters),
     (signal) => deps.source.fetchOpenAlerts(l3OpenAlerts(filters), sourceCtxOf(deps, signal)),
     deps.signal,
   );
@@ -38,7 +37,7 @@ export function loadOpenAlerts(filters: ItemFilters, deps: LoaderDeps): Promise<
  */
 export function loadOpenAlertOpenedEvents(filters: ItemFilters, deps: LoaderDeps): Promise<Paged<AlertEventRow>> {
   return openedMemo.get(
-    `L3o|${filtersKey(filters)}`,
+    memoKey(null, filters),
     (signal) => deps.source.fetchEvents(l3OpenedEvents(filters), sourceCtxOf(deps, signal)),
     deps.signal,
   );
@@ -52,7 +51,7 @@ export function loadOpenAlertOpenedEvents(filters: ItemFilters, deps: LoaderDeps
  */
 export function loadOpenAlertItems(filters: ItemFilters, deps: LoaderDeps): Promise<Paged<ItemRow>> {
   return itemsMemo.get(
-    `L3i|${filtersKey(filters)}`,
+    memoKey(null, filters),
     (signal) => deps.source.fetchItems(l3Items(filters), sourceCtxOf(deps, signal)),
     deps.signal,
   );

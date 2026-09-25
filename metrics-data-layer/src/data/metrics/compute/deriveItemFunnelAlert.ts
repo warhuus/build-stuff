@@ -1,7 +1,8 @@
 /**
  * itemFunnel alert view derive (spec §9 2.1–2.4 alert view; §5 B3, B10; Appendix A F3, F4, F6, O1).
  * Pure. 2.0 is `not-applicable`; 2.1 = lifecycleAlerts + (openAlerts − openWithLifecycleEvent); 2.2–2.4
- * from the L1 human rows (`alertSets`), under "now" restricted to alerts open now; `valueUsd` null.
+ * from the L1 human rows (`alertSets`) of the alerts in the 2.1 population only (nested funnel, Excel 2.2 =
+ * 2.1 ∩ …, spec §1; lead decision COR-01); `valueUsd` null.
  */
 import { FUNNEL_STAGES } from "../../../config/metrics";
 import type { MetricsConfig } from "../../../config/metrics";
@@ -18,9 +19,11 @@ import type {
   Selection,
   StageId,
 } from "../types";
-import { isAdditive, stagesForDim } from "../breakdowns";
-import { countOfGroup, groupRows } from "./breakdown";
-import { alertFunnelSets, actionTypeGroups, intersectIds, writebackTypeGroups } from "./alertSets";
+import { ALERT_VIEW_STAGES, stagesForDim, unhandledDimension } from "../breakdowns";
+import type { OpenAlertGroupField } from "../query/specs";
+import { inWindow } from "../window";
+import { countOfGroup, groupRows, nonEmptyGroups } from "./breakdown";
+import { alertFunnelSets, actionTypeGroups, writebackTypeGroups } from "./alertSets";
 import type { AlertFunnelSets } from "./alertSets";
 import { mergeCaveats } from "./caveats";
 import { caveatsIf, truncationCaveats } from "./deriveCommon";
@@ -33,8 +36,6 @@ import { clampNonNegative, remainder } from "./stats";
 /** Alert counts per section-2 stage (2.0 unused: not-applicable in the alert view). */
 type StageCounts = Readonly<Record<ItemStageId, number>>;
 
-/** The alert-view stages applicable to the total (2.0 is not-applicable, Appendix A F3). */
-const ALERT_STAGES: readonly ItemStageId[] = ["2.1", "2.2", "2.3", "2.4"];
 
 /** 2.1 term sum (spec §9 2.1): a + b with b = open − open-with-lifecycle-event, clamped at 0. */
 function carriedCount(lifecycle: number, open: number, openWithLifecycle: number): number {
@@ -72,63 +73,76 @@ function alertStages(
   );
 }
 
-/** Alerts open now under "now" (L3 alert ids), else null (no restriction). Spec §9 2.2 alert view. */
-function openNowRestriction(raw: AlertViewRaw): ReadonlySet<string> | null {
-  if (raw.window.key !== "now") return null;
-  return new Set((raw.openAlerts ?? []).map((alert) => alert.riskAlertId));
+/**
+ * The 2.1 population (spec §9 2.1 alert view: "distinct alerts open at any point in the window"; §8 = open
+ * now OR a closed event ≥ start; lead decision COR-01): ids of the L3 open alerts, plus, under a bounded
+ * window, the L2(selected window) facts with `closedAt` in the window. Under "now" only the open alerts.
+ * Missing rows (null) contribute nothing.
+ */
+export function carriedPopulation(raw: AlertViewRaw): ReadonlySet<string> {
+  const ids = new Set((raw.openAlerts ?? []).map((alert) => alert.riskAlertId));
+  if (raw.window.start === null) return ids;
+  for (const fact of raw.facts ?? []) if (fact.closedAt !== null && inWindow(fact.closedAt, raw.window)) ids.add(fact.riskAlertId);
+  return ids;
 }
 
 /**
- * Alert ids per group for the additive dims (spec §9 2.2 alert view): alertType / routingPersona /
- * priority from the L2 facts' `attrs`; escalated from the L3 open alerts. Null values → no group.
+ * Group key of a population alert for an additive alert-view dim (lead decision COR-02, spec §9 2.1 term b):
+ * an alert open now takes the value of its L3 AlertOrderFulfillment row on every stage; a closed alert takes
+ * its L2 `attrs` (latest pipeline event, W6). escalated exists only on open alerts (closed → no group).
  */
-function alertIdsByGroup(raw: AlertViewRaw, dimension: BreakdownDimension, config: MetricsConfig): Map<string, Set<string>> {
-  const grouped =
-    dimension === "escalated"
-      ? groupRows(raw.openAlerts ?? [], (alert) => openAlertDimValue(alert, dimension, config))
-      : groupRows(raw.facts ?? [], (fact) => attrsDimValue(fact.attrs, dimension));
-  return new Map([...grouped].map(([group, rows]) => [group, new Set(rows.map((row) => row.riskAlertId))]));
+function alertKeyOf(raw: AlertViewRaw, dimension: OpenAlertGroupField, config: MetricsConfig): (id: string) => string | null {
+  const openById = new Map((raw.openAlerts ?? []).map((alert) => [alert.riskAlertId, alert]));
+  const factById = new Map((raw.facts ?? []).map((fact) => [fact.riskAlertId, fact]));
+  return (id) => {
+    const open = openById.get(id);
+    if (open) return openAlertDimValue(open, dimension, config);
+    const fact = factById.get(id);
+    return fact === undefined || dimension === "escalated" ? null : attrsDimValue(fact.attrs, dimension);
+  };
+}
+
+/** Population alert ids per group of an additive dim (`alertKeyOf`); null keys → no group (`other`). */
+function alertIdsByGroup(population: ReadonlySet<string>, keyOf: (id: string) => string | null): Map<string, Set<string>> {
+  return new Map([...groupRows([...population], keyOf)].map(([group, ids]) => [group, new Set(ids)]));
 }
 
 /** 2.1 counts per raw value, summing the three grouped terms (spec §9 2.1, B3); zero-count groups dropped. */
 function carriedRanking(groups: CarriedAlertGroupsRaw | null): GroupCount[] {
   const terms = groups ?? { lifecycleAlerts: [], openAlerts: [], openWithLifecycleEvent: [] };
   const names = new Set([...terms.lifecycleAlerts, ...terms.openAlerts, ...terms.openWithLifecycleEvent].map((row) => row.group));
-  return [...names]
-    .map((group) => ({
-      group,
-      count: carriedCount(
-        countOfGroup(terms.lifecycleAlerts, group),
-        countOfGroup(terms.openAlerts, group),
-        countOfGroup(terms.openWithLifecycleEvent, group),
-      ),
-    }))
-    .filter((entry) => entry.count > 0);
+  const sums = [...names].map((group) => ({
+    group,
+    count: carriedCount(
+      countOfGroup(terms.lifecycleAlerts, group),
+      countOfGroup(terms.openAlerts, group),
+      countOfGroup(terms.openWithLifecycleEvent, group),
+    ),
+  }));
+  return nonEmptyGroups(sums);
+}
+
+/** What an alert-view breakdown needs from the total: its stage counts, its sets and the 2.1 population. */
+interface AlertTotals {
+  readonly counts: StageCounts;
+  readonly sets: AlertFunnelSets;
+  readonly population: ReadonlySet<string>;
 }
 
 /**
  * Additive alert-view breakdown (alertType, routingPersona, priority, escalated; spec §9 2.1–2.4): groups
- * chosen on 2.1; 2.2–2.4 per group from the human rows of the group's alerts (∩ open now under "now");
- * `other` per stage = total − Σ shown groups.
+ * chosen on 2.1; 2.2–2.4 per group from the human rows of the group's alerts, which are population alerts
+ * keyed by `alertKeyOf` (COR-01, COR-02); `other` per stage = total − Σ shown groups.
  */
-function additiveSpec(
-  raw: AlertViewRaw,
-  dimension: BreakdownDimension,
-  total: StageCounts,
-  config: MetricsConfig,
-): FunnelBreakdownSpec {
+function additiveSpec(raw: AlertViewRaw, dimension: OpenAlertGroupField, totals: AlertTotals, config: MetricsConfig): FunnelBreakdownSpec {
   const applicable = stagesForDim("itemFunnel", "alert", dimension);
   const ranking = carriedRanking(raw.carriedGroups);
-  const idsByGroup = alertIdsByGroup(raw, dimension, config);
-  const keep = openNowRestriction(raw);
-  const countsOf = (group: string): StageCounts => {
-    const ids = idsByGroup.get(group) ?? new Set<string>();
-    const sets = alertFunnelSets(raw.humanEvents, config, keep === null ? ids : intersectIds(ids, keep));
-    return countsOfSets(countOfGroup(ranking, group), sets);
-  };
+  const idsByGroup = alertIdsByGroup(totals.population, alertKeyOf(raw, dimension, config));
+  const countsOf = (group: string): StageCounts =>
+    countsOfSets(countOfGroup(ranking, group), alertFunnelSets(raw.humanEvents, config, idsByGroup.get(group) ?? new Set<string>()));
   const otherStages = (shown: readonly string[]): FunnelStageRaw[] => {
     const shownCounts = shown.map(countsOf);
-    const other = (id: ItemStageId): number => remainder(total[id], shownCounts.map((counts) => counts[id]));
+    const other = (id: ItemStageId): number => remainder(totals.counts[id], shownCounts.map((counts) => counts[id]));
     const counts: StageCounts = { ...ZERO_COUNTS, "2.1": other("2.1"), "2.2": other("2.2"), "2.3": other("2.3"), "2.4": other("2.4") };
     return alertStages(applicable, counts, raw, null);
   };
@@ -141,7 +155,12 @@ function additiveSpec(
  * stage per `eventType`, one alert in every type it has; `overlapRatio` on that stage; other stages
  * `not-applicable`.
  */
-function eventTypeSpec(dimension: BreakdownDimension, sets: AlertFunnelSets, raw: AlertViewRaw, config: MetricsConfig): FunnelBreakdownSpec {
+function eventTypeSpec(
+  dimension: "actionType" | "writebackType",
+  sets: AlertFunnelSets,
+  raw: AlertViewRaw,
+  config: MetricsConfig,
+): FunnelBreakdownSpec {
   const onWriteback = dimension === "writebackType";
   const stage: ItemStageId = onWriteback ? "2.4" : "2.3";
   const ranking = onWriteback ? writebackTypeGroups(raw.humanEvents, sets, config) : actionTypeGroups(raw.humanEvents, sets, config);
@@ -151,33 +170,53 @@ function eventTypeSpec(dimension: BreakdownDimension, sets: AlertFunnelSets, raw
   return { dimension, ranking, groupStages, additive: false, overlapTotal: (onWriteback ? sets.stage24 : sets.stage23).size };
 }
 
-/** The alert-view breakdown of `dimension`: additive per the registry, else the event-type spec. */
+/**
+ * The alert-view breakdown of `dimension` (Appendix A registry, alert view): alert attributes and escalated
+ * additive, actionType / writebackType per event type. Item dims and queueFilter are not in the alert-view
+ * registry row (loadCard rejects them with `breakdown-not-allowed`); reaching here with one throws `RangeError`.
+ */
 function alertViewBreakdown(
   raw: AlertViewRaw,
   dimension: BreakdownDimension,
   context: FunnelContext,
-  totals: { readonly counts: StageCounts; readonly sets: AlertFunnelSets },
+  totals: AlertTotals,
   config: MetricsConfig,
 ): FunnelBreakdownOutput {
-  const spec = isAdditive("itemFunnel", "alert", dimension)
-    ? additiveSpec(raw, dimension, totals.counts, config)
-    : eventTypeSpec(dimension, totals.sets, raw, config);
-  return funnelBreakdown(spec, context, config);
+  switch (dimension) {
+    case "alertType":
+    case "routingPersona":
+    case "priority":
+    case "escalated":
+      return funnelBreakdown(additiveSpec(raw, dimension, totals, config), context, config);
+    case "actionType":
+    case "writebackType":
+      return funnelBreakdown(eventTypeSpec(dimension, totals.sets, raw, config), context, config);
+    case "businessLine":
+    case "productLine":
+    case "region":
+    case "plant":
+    case "queueFilter":
+      throw new RangeError(`${dimension} is not an itemFunnel alert-view breakdown`);
+    default:
+      return unhandledDimension(dimension);
+  }
 }
 
 /**
- * itemFunnel alert view: total = 2.0 not-applicable, 2.1–2.4 alert counts (valueUsd null) with outside
- * paths on 2.3 / 2.4; with a dim, `alertViewBreakdown`. Card caveats: the stage codes;
+ * itemFunnel alert view (spec §9 2.1–2.4 alert view): total = 2.0 not-applicable, 2.1–2.4 alert counts
+ * (valueUsd null) with outside paths on 2.3 / 2.4, 2.2–2.4 and outside paths over the 2.1 population only
+ * (`carriedPopulation`, COR-01); with a dim, `alertViewBreakdown`. Card caveats: the stage codes;
  * `value-item-view-only` under unit valueUsd; escalated `escalated-open-only`; actionType / writebackType
  * `overlap`; `truncated` (top-N cut or a grouped 2.1 call returned `MAX_GROUPS` rows).
  */
 export function deriveAlertView(raw: AlertViewRaw, selection: Selection, config: MetricsConfig): DeriveOutput<FunnelSeries> {
   const context: FunnelContext = { section: 2, view: "alert", window: raw.window.key, unit: selection.unit, generatedAt: raw.generatedAt };
-  const sets = alertFunnelSets(raw.humanEvents, config, openNowRestriction(raw));
+  const population = carriedPopulation(raw);
+  const sets = alertFunnelSets(raw.humanEvents, config, population);
   const counts = countsOfSets(carriedCount(raw.carried.lifecycleAlerts, raw.carried.openAlerts, raw.carried.openWithLifecycleEvent), sets);
-  const total = funnelSeries({ ...context, stages: alertStages(ALERT_STAGES, counts, raw, sets) });
+  const total = funnelSeries({ ...context, stages: alertStages(ALERT_VIEW_STAGES, counts, raw, sets) });
   const dimension = raw.dimension;
-  const grouped = dimension === null ? null : alertViewBreakdown(raw, dimension, context, { counts, sets }, config);
+  const grouped = dimension === null ? null : alertViewBreakdown(raw, dimension, context, { counts, sets, population }, config);
   const breakdown = grouped?.breakdown ?? null;
   const cg = raw.carriedGroups;
   return {

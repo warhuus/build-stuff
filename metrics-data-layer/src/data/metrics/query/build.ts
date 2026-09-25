@@ -3,7 +3,7 @@
  * No OSDK, no apiNames, no I/O. Item-funnel stage sets live in `buildFunnel.ts`; risk and 4.1/L3 sets in
  * `buildRisk.ts`. Both re-use the primitives exported here.
  */
-import { ITEM_DIMS } from "../../../config/metrics";
+import { hasFilters } from "../selection";
 import type { ItemFilters, Window } from "../types";
 import type {
   EventFilter,
@@ -16,9 +16,6 @@ import type {
 
 /** Non-empty predicate list (OR-ed), as `EventFilter.predicates` requires (decision D3). */
 export type Predicates = readonly [EventPredicate, ...EventPredicate[]];
-
-/** True when at least one item-filter dimension has a value (spec §9.0 `isEmpty` negated). */
-export const hasItemFilters = (f: ItemFilters): boolean => ITEM_DIMS.some((d) => f[d].length > 0);
 
 /** Every sales order item (SalesOrders). */
 export const allItems: ItemSet = { kind: "all" };
@@ -33,16 +30,19 @@ export const allOpenAlerts: OpenAlertSet = { kind: "all" };
  * Spec §9 2.0 proxy: items open at any point in `w` (created ≤ end AND (isOpen OR actualGiDate ≥ start),
  * date-only bounds). Under "now" (`start` null) the compiler emits `isOpen = true` only.
  */
-export const openItemsInWindow = (w: Window): ItemSet => ({ kind: "openInWindow", window: w });
+export const itemsOpenInWindow = (w: Window): ItemSet => ({ kind: "openInWindow", window: w });
 
 /**
  * Spec §9.0 `withItemFilters`: `set` restricted by the item filters (one `$in` per non-empty dimension,
  * applied by the compiler). Returns `set` itself, unchanged, when every dimension is empty.
  */
 export const withItemFilters = (set: ItemSet, f: ItemFilters): ItemSet =>
-  hasItemFilters(f) ? { kind: "filtered", base: set, filters: f } : set;
+  hasFilters(f) ? { kind: "filtered", base: set, filters: f } : set;
 
-/** `base` events narrowed by predicates (OR) and a window (`null` = no time bound; "now" = ≤ end). */
+/**
+ * `base` events narrowed by predicates (OR) and a window (spec §9.0 `tsIn(w)`: `start ≤ ts ≤ end`; `null` = no
+ * time bound; "now" = `ts ≤ end` only, all-time up to now).
+ */
 export const eventsWhere = (base: EventSet, predicates: Predicates, window: Window | null): EventSet => {
   const filter: EventFilter = { predicates, window };
   return { kind: "where", base, filter };
@@ -53,14 +53,14 @@ export const eventsWhere = (base: EventSet, predicates: Predicates, window: Wind
  * reached by pivoting from the filtered items (`ofItems`); without filters AlertHistory is filtered directly.
  */
 export const events = (preds: Predicates, w: Window, f: ItemFilters): EventSet =>
-  eventsWhere(hasItemFilters(f) ? { kind: "ofItems", items: withItemFilters(allItems, f) } : allEvents, preds, w);
+  eventsWhere(hasFilters(f) ? { kind: "ofItems", items: withItemFilters(allItems, f) } : allEvents, preds, w);
 
 /** Spec §9.0.1 L1: human events in `w` (all-time up to end under "now"), item filters by pivot. */
 export const humanEvents = (w: Window, f: ItemFilters): EventSet => events(["human"], w, f);
 
 /** Spec §9.0 `aofSet(f)`: open alerts; with item filters, those of the filtered items (pivot). */
 export const openAlerts = (f: ItemFilters): OpenAlertSet =>
-  hasItemFilters(f) ? { kind: "ofItems", items: withItemFilters(allItems, f) } : allOpenAlerts;
+  hasFilters(f) ? { kind: "ofItems", items: withItemFilters(allItems, f) } : allOpenAlerts;
 
 /** Items of an event set (pivot `salesOrder_1`). */
 export const itemsOfEvents = (set: EventSet): ItemSet => ({ kind: "ofEvents", events: set });

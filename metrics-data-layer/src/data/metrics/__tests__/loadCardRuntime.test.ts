@@ -1,13 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { CARD_IMPL } from "../catalogue";
-import { createProgressSum, loadCard, peekCard } from "../loadCard";
+import { loadCard, peekCard } from "../loadCard";
 import { DEFAULT_SELECTION } from "../selection";
 import { clearMetricsCache } from "../shared/cache";
+import { withCallProgress } from "../shared/sourceCtx";
 import { appSemaphore } from "../shared/concurrency";
 import { createFakeSource } from "../source/fake/fakeSource";
 import { FIXTURE_CONFIG, FIXTURE_NOW } from "../source/fake/fixtures";
 import type { MetricsSource } from "../source/MetricsSource";
-import type { Progress, Selection } from "../types";
+import type { CardData, FunnelSeries, MetricResult, Progress, Selection } from "../types";
 import { wrapSource } from "./loadCardTestUtils";
 
 const opts = (source: MetricsSource = createFakeSource()) => ({ source, now: FIXTURE_NOW, config: FIXTURE_CONFIG });
@@ -33,11 +34,26 @@ describe("loadCard: errors, abort, concurrency, progress", () => {
     expect(source.calls).toEqual([]);
   });
 
-  it("an aborted signal gives status error AbortError", async () => {
+  it("an aborted signal gives status error aborted (TYP-07)", async () => {
     const controller = new AbortController();
     controller.abort();
     const r = await loadCard("riskDistribution", sel(), null, { ...opts(), signal: controller.signal });
-    expect(r).toMatchObject({ status: "error", error: "AbortError" });
+    expect(r).toMatchObject({ status: "error", error: "aborted" });
+  });
+
+  it("an abort raised by the source with its own message also reads aborted (TYP-07)", async () => {
+    const native = wrapSource(createFakeSource(), () => Promise.reject(new DOMException("The operation was aborted.", "AbortError")));
+    const r = await loadCard("riskDistribution", sel(), null, opts(native));
+    expect(r).toMatchObject({ status: "error", error: "aborted" });
+  });
+
+  it("aborting mid-load gives status error aborted", async () => {
+    const controller = new AbortController();
+    const source = wrapSource(createFakeSource(), () => {
+      controller.abort();
+    });
+    const r = await loadCard("raisedToClosed", sel({ window: 7 }), null, { ...opts(source), signal: controller.signal });
+    expect(r).toMatchObject({ status: "error", error: "aborted" });
   });
 
   it("a failing derive becomes status error (loadCard and peekCard)", async () => {
@@ -81,20 +97,66 @@ describe("loadCard: errors, abort, concurrency, progress", () => {
   });
 });
 
-describe("createProgressSum (D24)", () => {
-  it("sums interleaved per-fetch cumulative counts", () => {
-    const totals: number[] = [];
-    const sum = createProgressSum((p) => totals.push(p.loaded));
-    expect(sum.last()).toBeUndefined();
-    // Fetch A: 1000, 2000; fetch B (parallel): 1000, 1500; fetch C starts after: 300.
-    for (const loaded of [1000, 1000, 2000, 1500, 300]) sum.report({ loaded });
-    expect(totals).toEqual([1000, 2000, 3000, 3500, 3800]);
-    expect(sum.last()).toEqual({ loaded: 3800 });
+describe("loadCard: progress is summed per port call (D24, MOD-01)", () => {
+  /** A fake whose own reports are silenced; `before` scripts the reports of the n-th paged call instead. */
+  function scripted(script: readonly (readonly number[])[]): MetricsSource {
+    const silent = withCallProgress(createFakeSource(), () => undefined);
+    let n = 0;
+    return wrapSource(silent, (method, _args, ctx) => {
+      if (!method.startsWith("fetch")) return;
+      for (const loaded of script[n] ?? []) ctx.onProgress?.({ loaded });
+      n += 1;
+    });
+  }
+
+  it("sequential fetches 500, then 1000 / 2000, total 2500 (the MOD-01 repro)", async () => {
+    const seen: number[] = [];
+    const r = await loadCard("raisedToClosed", sel({ window: 7 }), null, {
+      ...opts(scripted([[500], [1000, 2000]])),
+      onProgress: (p) => seen.push(p.loaded),
+    });
+    expect(seen).toEqual([500, 1500, 2500]);
+    expect(r.progress).toEqual({ loaded: 2500 });
   });
 
-  it("works without a sink", () => {
-    const sum = createProgressSum(undefined);
-    sum.report({ loaded: 5 });
-    expect(sum.last()).toEqual({ loaded: 5 });
+  it("a fetch 1000 / 1500 then a verdict lookup 500 / 1000 / 2000 totals 3500", async () => {
+    const seen: number[] = [];
+    await loadCard("raisedToClosed", sel({ window: 7 }), null, {
+      ...opts(scripted([[1000, 1500], [500, 1000, 2000]])),
+      onProgress: (p) => seen.push(p.loaded),
+    });
+    expect(seen[seen.length - 1]).toBe(3500);
+  });
+
+  it("a cache hit carries no progress", async () => {
+    const source = createFakeSource();
+    await loadCard("raisedToClosed", sel({ window: 7 }), null, opts(source));
+    const seen: Progress[] = [];
+    const r = await loadCard("raisedToClosed", sel({ window: 7 }), null, { ...opts(source), onProgress: (p) => seen.push(p) });
+    expect(seen).toEqual([]);
+    expect(r.progress).toBeUndefined();
+  });
+});
+
+describe("MetricResult narrows on status (TYP-01)", () => {
+  it("data is required after ok/partial, blocked after blocked, error after error", async () => {
+    const r = await loadCard("userFunnel", sel({ window: 7 }), null, opts());
+    expectTypeOf(r).toEqualTypeOf<MetricResult<CardData<FunnelSeries>>>();
+    if (r.status === "ok" || r.status === "partial") {
+      expectTypeOf(r.data).toEqualTypeOf<CardData<FunnelSeries>>();
+      expectTypeOf(r.blocked).toEqualTypeOf<undefined>();
+    } else if (r.status === "blocked") {
+      expectTypeOf(r.blocked).toEqualTypeOf<{ readonly reason: typeof r.blocked.reason; readonly unblockedBy: string }>();
+      expectTypeOf(r.data).toEqualTypeOf<undefined>();
+    } else if (r.status === "error") {
+      expectTypeOf(r.error).toEqualTypeOf<string>();
+      expectTypeOf(r.data).toEqualTypeOf<undefined>();
+    } else {
+      expectTypeOf(r.status).toEqualTypeOf<"loading">();
+      expectTypeOf(r.data).toEqualTypeOf<CardData<FunnelSeries> | undefined>();
+    }
+    // Spec §10 optional reads still compile on the whole union.
+    expectTypeOf(r.data?.total).toEqualTypeOf<FunnelSeries | undefined>();
+    expect(r.status === "ok" || r.status === "blocked").toBe(true);
   });
 });

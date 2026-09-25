@@ -9,7 +9,7 @@ import {
   toVerdictRow,
   verdictDateReader,
 } from "../../../source/osdk/rowMapping";
-import { chunkIds, fetchAllPages, mergePaged, runLimited } from "../../../source/osdk/paging";
+import { fetchAllPages } from "../../../source/osdk/paging";
 import { TEST_CONFIG } from "./osdkTestUtils";
 
 describe("row mapping (decision D15)", () => {
@@ -87,43 +87,13 @@ describe("row mapping (decision D15)", () => {
 });
 
 describe("paging helpers", () => {
-  it("chunkIds splits and yields nothing for no ids", () => {
-    expect(chunkIds(["a", "b", "c"], 2)).toEqual([["a", "b"], ["c"]]);
-    expect(chunkIds([], 2)).toEqual([]);
-  });
-
-  it("runLimited keeps order and never exceeds the limit", async () => {
-    let inFlight = 0;
-    let max = 0;
-    const out = await runLimited([1, 2, 3, 4, 5, 6], 2, new AbortController().signal, async (n) => {
-      inFlight += 1;
-      max = Math.max(max, inFlight);
-      await new Promise((r) => setTimeout(r, 7 - n));
-      inFlight -= 1;
-      return n * 10;
-    });
-    expect(out).toEqual([10, 20, 30, 40, 50, 60]);
-    expect(max).toBe(2);
-  });
-
-  it("runLimited stops starting tasks after a failure", async () => {
-    const started: number[] = [];
-    const run = runLimited([1, 2, 3, 4], 1, new AbortController().signal, async (n) => {
-      started.push(n);
-      if (n === 2) throw new Error("boom");
-      return n;
-    });
-    await expect(run).rejects.toThrow("boom");
-    expect(started).toEqual([1, 2]);
-  });
-
   it("fetchAllPages tolerates a missing data array and a null token", async () => {
     const page = () => Promise.resolve({ data: [], nextPageToken: undefined, totalCount: "0" });
     expect(await fetchAllPages(page, new AbortController().signal, 10, () => undefined)).toEqual({ rows: [], capped: false });
   });
 
-  it("mergePaged propagates capped", () => {
-    expect(mergePaged([{ rows: [1], capped: true }, { rows: [2], capped: false }], 10)).toEqual({ rows: [1, 2], capped: true });
-    expect(mergePaged([{ rows: [1, 2], capped: false }, { rows: [3], capped: false }], 2)).toEqual({ rows: [1, 2], capped: true });
+  it("fetchAllPages reports capped when the rows reach the cap exactly (spec §9.0, lead note L1)", async () => {
+    const page = () => Promise.resolve({ data: [1, 2], nextPageToken: undefined, totalCount: "2" });
+    expect(await fetchAllPages(page, new AbortController().signal, 2, () => undefined)).toEqual({ rows: [1, 2], capped: true });
   });
 });

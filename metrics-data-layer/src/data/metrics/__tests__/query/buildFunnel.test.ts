@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { itemsWithEvent, openAlerts, openItemsInWindow } from "../../query/build";
+import { itemsWithEvent, openAlerts, itemsOpenInWindow } from "../../query/build";
 import { alertedItems, carriedAlertSets, itemFunnelSets, stageWithOpenAlertWhere } from "../../query/buildFunnel";
 import { createFakeSource } from "../../source/fake/fakeSource";
 import { FIXTURE_CONFIG } from "../../source/fake/fixtures";
@@ -20,7 +20,7 @@ describe("itemFunnel stage sets (spec §9 2.0–2.4)", () => {
 
   it("chains so20 → so24 by intersection and builds both outside paths", () => {
     const s = itemFunnelSets(W7, NONE);
-    expect(s.so20).toEqual(openItemsInWindow(W7));
+    expect(s.so20).toEqual(itemsOpenInWindow(W7));
     expect(s.so21).toEqual({ kind: "intersect", a: s.so20, b: alertedItems(W7) });
     expect(s.so22).toEqual({ kind: "intersect", a: s.so21, b: itemsWithEvent(["viewed"], W7) });
     expect(s.so23).toEqual({ kind: "intersect", a: s.so22, b: itemsWithEvent(["action"], W7) });
@@ -38,7 +38,7 @@ describe("itemFunnel stage sets (spec §9 2.0–2.4)", () => {
   });
 
   it("filters enter once, through so20", () => {
-    expect(itemFunnelSets(W7, BL).so20).toEqual({ kind: "filtered", base: openItemsInWindow(W7), filters: BL });
+    expect(itemFunnelSets(W7, BL).so20).toEqual({ kind: "filtered", base: itemsOpenInWindow(W7), filters: BL });
   });
 
   it("stage ∩ items with an open alert matching the condition (perGroup)", () => {

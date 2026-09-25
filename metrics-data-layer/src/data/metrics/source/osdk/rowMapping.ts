@@ -3,8 +3,9 @@
  * declares non-null, e.g. `eventTimestamp`) is dropped; other missing values become `null`. Timestamps are
  * normalised to ISO-8601 UTC; date values to `YYYY-MM-DD`. The `$select` lists are literal tuples (spec §8).
  */
+import { PLACEHOLDER } from "../../../../config/metrics";
 import type { AlertEventRow, ItemRow, MetricsConfig, OpenAlertRow, VerdictRow } from "../../types";
-import { toDateOnly } from "./compileWhere";
+import { dateOnlyOrNull } from "../../window";
 
 /** A property value as the client may deliver it: typed `T | undefined`; `null` accepted defensively. */
 type Val<T> = T | null | undefined;
@@ -154,22 +155,24 @@ export function verdictDateReader(config: MetricsConfig): (r: OsdkVerdictRow) =>
       return (r) => r.otifOtShipmentEndDate;
     case "otifFirstInitialDeliveryDateTarget":
       return (r) => r.otifFirstInitialDeliveryDateTarget;
-    default:
+    case PLACEHOLDER:
       throw new Error("VERDICT_DATE_PROPERTY is not set (needs-integration-value)");
   }
 }
 
-/** OtifOrderVerdict → VerdictRow (`verdictDate` `YYYY-MM-DD` from `dateOf`); `null` (dropped) without otifOrderId. */
+/**
+ * OtifOrderVerdict → VerdictRow; `null` (dropped) without otifOrderId (D15). `verdictDate` = the UTC calendar
+ * date (`window.dateOnlyOrNull`, lead note L2) of `dateOf(r)`; missing, empty or unparsable → null.
+ */
 export function toVerdictRow(r: OsdkVerdictRow, dateOf: (r: OsdkVerdictRow) => Val<string>): VerdictRow | null {
   const otifOrderId = str(r.otifOrderId);
   if (otifOrderId === null) return null;
-  const date = str(dateOf(r));
   return {
     otifOrderId,
     otifVerdict: str(r.initOtifClassification),
     critVerdict: str(r.critClassification),
     otifExclusion: str(r.officialExclusionOtif),
     critExclusion: str(r.officialExclusionCrit),
-    verdictDate: date === null || date === "" ? null : toDateOnly(date),
+    verdictDate: dateOnlyOrNull(str(dateOf(r))),
   };
 }

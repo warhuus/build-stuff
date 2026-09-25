@@ -19,7 +19,8 @@ import type {
   Selection,
   StageId,
 } from "../types";
-import { firstApplicableStage, isAdditive, isAlertDim, stagesForDim } from "../breakdowns";
+import { firstApplicableStage, isAdditive, isAlertDim, isItemDim, stagesForDim } from "../breakdowns";
+import { nonEmptyGroups } from "./breakdown";
 import { mergeCaveats } from "./caveats";
 import { caveatsIf, truncationCaveats } from "./deriveCommon";
 import { funnelSeries, itemAmounts, okStage, outsidePathOf } from "./funnel";
@@ -44,6 +45,7 @@ function outsidePathOfStage(raw: ItemViewRaw, id: ItemStageId): OutsidePath | nu
  * Item-view breakdown (spec §9 2.0–2.4): group list chosen once on the first applicable stage (2.0 for
  * item dims, 2.1 for alert dims); each group a full series (outside paths null, stages the dim does not
  * apply to `not-applicable`); additive `other` per stage = total − Σ shown groups, count and value.
+ * Zero-count candidates (alert dims: AOF values with no item in 2.1) are dropped before top-N (COR-03).
  */
 function itemViewBreakdown(
   raw: ItemViewRaw,
@@ -67,7 +69,7 @@ function itemViewBreakdown(
       };
       return okStage(id, amounts, stageCaveats(id));
     });
-  const ranking = countsOf(stageLookup(byStage, first) ?? []);
+  const ranking = nonEmptyGroups(countsOf(stageLookup(byStage, first) ?? []));
   const spec: FunnelBreakdownSpec = isAdditive("itemFunnel", "item", dimension)
     ? { dimension, ranking, groupStages, additive: true, otherStages }
     : { dimension, ranking, groupStages, additive: false, overlapTotal: stageLookup(totals, first)?.count ?? null };
@@ -75,7 +77,18 @@ function itemViewBreakdown(
 }
 
 /**
- * itemFunnel item view: total = 2.0–2.4 count and value with outside paths on 2.3 / 2.4 and the stage
+ * The grouped server results of the raw, for the `MAX_GROUPS` truncation check (spec §9.0 Truncation,
+ * MOD-02): item dims → every stage's `countItemsBy` list; alert dims → the 2.1 list, one entry per candidate
+ * of the grouped `countOpenAlertsBy` call (2.2–2.4 hold only the top-N, from ungrouped counts).
+ */
+function groupedCallLists(raw: ItemViewRaw): readonly (readonly GroupCountValue[] | undefined)[] {
+  if (raw.dimension === null) return [];
+  if (isItemDim(raw.dimension)) return FUNNEL_STAGES.item.map((id) => raw.groups?.[id]);
+  return [raw.groups?.["2.1"]];
+}
+
+/**
+ * itemFunnel item view (spec §9 2.0–2.4 item view): total = 2.0–2.4 count and value with outside paths on 2.3 / 2.4 and the stage
  * caveats (`itemStageCaveats`); with a dim, `itemViewBreakdown`. Card caveats: the stage codes; alert dims
  * `breakdown-open-only` and `overlap`; escalated `escalated-open-only`; `truncated` (top-N cut or a
  * grouped call returned `MAX_GROUPS` rows).
@@ -105,7 +118,7 @@ export function deriveItemView(raw: ItemViewRaw, selection: Selection, config: M
       caveatsIf(alertDim, ["breakdown-open-only"]),
       caveatsIf(breakdown !== null && !breakdown.additive, ["overlap"]),
       caveatsIf(dimension === "escalated", ["escalated-open-only"]),
-      truncationCaveats(breakdown, FUNNEL_STAGES.item.map((id) => raw.groups?.[id]), config),
+      truncationCaveats(breakdown, groupedCallLists(raw), config),
     ),
   };
 }

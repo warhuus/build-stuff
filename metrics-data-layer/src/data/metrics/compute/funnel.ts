@@ -51,7 +51,7 @@ export function firstOkStageId(stages: readonly FunnelStageRaw[]): StageId | nul
  * - division by zero or null → null. Unit `valueUsd` with null values falls back to counts and reports
  *   `value-item-view-only` (Appendix A F6). Count vs value give different percentages (B8).
  */
-export function deriveStages(stages: readonly FunnelStageRaw[], unit: Unit): DerivedStages {
+export function deriveFunnel(stages: readonly FunnelStageRaw[], unit: Unit): DerivedStages {
   const fallback = usesCountFallback(stages, unit);
   const valueOf = (stage: FunnelStageRaw): number | null =>
     unit === "count" || fallback ? stage.count : stage.valueUsd;
@@ -123,7 +123,7 @@ export interface FunnelSeriesInput {
   readonly stages: readonly FunnelStageRaw[];
 }
 
-/** A `FunnelSeries` plus the derivation caveats (`deriveStages`). */
+/** A `FunnelSeries` plus the derivation caveats (`deriveFunnel`). */
 export interface FunnelSeriesResult {
   readonly series: FunnelSeries;
   readonly caveats: readonly Caveat[];
@@ -131,17 +131,19 @@ export interface FunnelSeriesResult {
 
 /**
  * Builds a `FunnelSeries` (spec §10): derives the stages in `unit`; `firstStageId` = first `ok` stage
- * (§12.2 S1: from data), or the section's first stage id when no stage is ok. Caveats: see `deriveStages`.
+ * (§12.2 S1: from data), or the section's first stage id when no stage is ok. `unit` = the unit the numbers
+ * are in: `"count"` under the count fallback (Appendix A F6; SPF-01), else the selected unit. Caveats: see
+ * `deriveFunnel`.
  */
 export function funnelSeries(input: FunnelSeriesInput): FunnelSeriesResult {
-  const derived = deriveStages(input.stages, input.unit);
+  const derived = deriveFunnel(input.stages, input.unit);
   const sectionFirst = input.section === 1 ? FUNNEL_STAGES.user[0] : FUNNEL_STAGES.item[0];
   return {
     series: {
       section: input.section,
       view: input.view,
       window: input.window,
-      unit: input.unit,
+      unit: usesCountFallback(input.stages, input.unit) ? "count" : input.unit,
       firstStageId: firstOkStageId(input.stages) ?? sectionFirst,
       stages: derived.stages,
       generatedAt: input.generatedAt,

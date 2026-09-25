@@ -6,8 +6,8 @@
 import { CLOSURE_GROUPS } from "../../../config/metrics";
 import type { MetricsConfig } from "../../../config/metrics";
 import type { AlertLifecycleRow, BreakdownDimension, BreakdownResult, ClosureGroup, CompositionResult, GroupCount } from "../types";
-import { buildBreakdown, countOfGroup, rowsOutside } from "./breakdown";
-import { attrsDimValue } from "./dimValues";
+import { buildBreakdown, countOfGroup, groupRows, rowsOutside } from "./breakdown";
+import { factKeyOf } from "./dimValues";
 import { remainder } from "./stats";
 
 /**
@@ -39,13 +39,14 @@ export function compositionBreakdown(
   touched: readonly AlertLifecycleRow[],
   config: MetricsConfig,
 ): BreakdownResult<CompositionResult> {
-  const keyOf = (fact: AlertLifecycleRow): string | null => attrsDimValue(fact.attrs, dimension);
+  const keyOf = factKeyOf(dimension, null);
+  const touchedByGroup = groupRows(touched, keyOf);
   return buildBreakdown(
     {
       dimension,
       additive: true,
       ranking: byGroup,
-      dataOf: (group) => compositionOf(countOfGroup(byGroup, group), touched.filter((fact) => keyOf(fact) === group)),
+      dataOf: (group) => compositionOf(countOfGroup(byGroup, group), touchedByGroup.get(group) ?? []),
       otherOf: (shown) =>
         compositionOf(
           remainder(closedTotal, shown.map((group) => countOfGroup(byGroup, group))),

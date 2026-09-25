@@ -60,11 +60,10 @@ export function bucketOfRangeStart(start: number, config: MetricsConfig): Scored
   return rangesFromConfig(config).find((range) => range.start === start)?.bucket ?? null;
 }
 
-/** All seven buckets at count 0, value 0. */
-export function emptyBucketAmounts(): BucketAmounts {
-  return fromEntries(RISK_BUCKETS.map((bucket) => [bucket, ZERO]));
-}
-
+/**
+ * Bucket amounts from (bucket, amount) entries, zero for absent buckets. The literal record lists every
+ * `RiskBucketId`, so a new bucket in `config.RISK_BUCKETS` fails to compile here until it is added.
+ */
 function fromEntries(entries: readonly (readonly [RiskBucketId, CountValue])[]): BucketAmounts {
   const amounts: Record<RiskBucketId, CountValue> = {
     unscored: ZERO, b15_30: ZERO, b31_50: ZERO, b51_70: ZERO, b71_90: ZERO, b91_100: ZERO, delayed: ZERO,
