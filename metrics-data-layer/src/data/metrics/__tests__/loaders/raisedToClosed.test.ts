@@ -128,7 +128,7 @@ describe("loadRaisedToClosed (spec §9 4.2; D2, D11, D12)", () => {
     ]);
   });
 
-  it("row cap: any capped fetch → partial + row-cap (with not-worked-window-cap at 30)", async () => {
+  it("row cap: a capped fetch → partial + row-cap (with not-worked-window-cap at 30)", async () => {
     // ROW_CAP 5: L1("now") has 66 rows → capped.
     const config = { ROW_CAP: 5, PAGE_SIZE: 5 };
     const seven = await loadRaisedToClosed(sel(7), null, fakeDeps({ config }));
