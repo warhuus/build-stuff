@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveItemFunnel } from "../../compute/deriveItemFunnel";
 import { loadItemFunnel } from "../../loaders/itemFunnel";
-import { openAlerts } from "../../query/build";
 import { itemFunnelSets } from "../../query/buildFunnel";
 import { DEFAULT_SELECTION, EMPTY_FILTERS } from "../../selection";
 import type { BreakdownDimension, CountValue, ItemFilters, ItemViewRaw, Selection, WindowKey } from "../../types";
