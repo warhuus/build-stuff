@@ -6,10 +6,17 @@ import {
   breakdownRule,
   firstApplicableStage,
   isAdditive,
+  ALERT_VIEW_STAGES,
+  eventGroupFieldOf,
+  isAlertAttrDim,
   isAlertDim,
   isBreakdownAllowed,
   isItemDim,
+  isOpenAlertFilterDim,
+  isQueriedUserStage,
+  QUERIED_USER_STAGES,
   stagesForDim,
+  unhandledDimension,
 } from "../breakdowns";
 import type { CardId, ItemFunnelView } from "../types";
 
@@ -138,5 +145,40 @@ describe("dimension kinds", () => {
       "actionType",
       "writebackType",
     ]);
+  });
+});
+
+describe("registry guards (MOD-04, TYP-05)", () => {
+  it("alert attributes, open-alert filter dims", () => {
+    expect(BREAKDOWN_DIMENSIONS.filter(isAlertAttrDim)).toEqual(["routingPersona", "priority", "alertType"]);
+    expect(isAlertAttrDim(null)).toBe(false);
+    expect(BREAKDOWN_DIMENSIONS.filter(isOpenAlertFilterDim)).toEqual(["routingPersona", "priority", "escalated"]);
+  });
+
+  it("AlertHistory group field per dim (spec §9.0 ahGroupBy); null for item dims and escalated", () => {
+    expect(BREAKDOWN_DIMENSIONS.map((d) => [d, eventGroupFieldOf(d)])).toEqual([
+      ["businessLine", null],
+      ["productLine", null],
+      ["region", null],
+      ["plant", null],
+      ["routingPersona", "routingPersona"],
+      ["priority", "priority"],
+      ["escalated", null],
+      ["alertType", "alertType"],
+      ["actionType", "actionType"],
+      ["writebackType", "writebackType"],
+      ["queueFilter", "queueFilter"],
+    ]);
+  });
+
+  it("stage lists come from config FUNNEL_STAGES", () => {
+    expect(QUERIED_USER_STAGES).toEqual(["1.1", "1.2", "1.3", "1.4"]);
+    expect(isQueriedUserStage("1.0")).toBe(false);
+    expect(ALERT_VIEW_STAGES).toEqual(["2.1", "2.2", "2.3", "2.4"]);
+  });
+
+  it("the never arm throws at run time for an unknown value", () => {
+    const unknown = "userRole" as never;
+    expect(() => unhandledDimension(unknown)).toThrow(TypeError);
   });
 });

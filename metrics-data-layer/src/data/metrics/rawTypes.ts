@@ -70,8 +70,9 @@ export interface CarriedAlertGroupsRaw {
   readonly openWithLifecycleEvent: readonly GroupCount[];
 }
 /**
- * itemFunnel alert view (spec §9 2.1–2.4 alert view). 2.2–2.4 are derived from L1 rows; `facts` (L2) only
- * with alertType/routingPersona/priority; `openAlerts` (L3 alerts) only under "now" or with escalated.
+ * itemFunnel alert view (spec §9 2.1–2.4 alert view). 2.2–2.4 are derived from L1 rows, restricted to the 2.1
+ * population (open now, or closed in the window). `facts` (L2, selected window) and `openAlerts` (L3 alerts) are
+ * always loaded in this view (phase-4 decision COR-01/COR-02); the null in their types is kept for the frozen shape.
  */
 export interface AlertViewRaw extends RawBase {
   readonly view: "alert";

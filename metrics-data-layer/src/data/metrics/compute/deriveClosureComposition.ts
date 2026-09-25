@@ -10,7 +10,7 @@ import { caveatsIfNow, truncationCaveats } from "./deriveCommon";
 import { closedInWindow } from "./durations";
 
 /**
- * 4.6 derive: total = `compositionOf(closedTotal, touched closed in window)`; with a dim, the additive
+ * 4.6 derive (spec §9 4.6): total = `compositionOf(closedTotal, touched closed in window)`; with a dim, the additive
  * `compositionBreakdown` over `closedTotalByGroup` (absent → no groups). Caveats: `closure-actor-unknown`,
  * `precedence` (always); `truncated` when top-N cut groups or the grouped call returned `MAX_GROUPS` rows;
  * `now-all-time` under "now".

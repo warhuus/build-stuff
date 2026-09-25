@@ -153,11 +153,15 @@ describe("loadRiskDistribution (spec §9 3.1, D17)", () => {
 
   it("truncated when a grouped call returns exactly MAX_GROUPS rows", async () => {
     // MAX_GROUPS 2: all-side unscored by region has exactly 2 groups (AMER, EMEA).
-    const out = await loadRiskDistribution(sel(7), "region", fakeDeps({ config: { MAX_GROUPS: 2 } }));
-    expect(out).toMatchObject({ status: "ok", caveats: ["truncated"] });
+    // The loader adds no caveat (MOD-02); derive decides from the grouped lists in the raw.
+    const deps = fakeDeps({ config: { MAX_GROUPS: 2 } });
+    const out = await loadRiskDistribution(sel(7), "region", deps);
+    expect(out).toMatchObject({ status: "ok", caveats: [] });
+    expect(deriveRiskDistribution(out.raw, sel(7), deps.config).caveats).toContain("truncated");
     // MAX_GROUPS 3: no bucket has 3 regions (only 2 non-null values exist).
-    const none = await loadRiskDistribution(sel(7), "region", fakeDeps({ config: { MAX_GROUPS: 3 } }));
-    expect(none.caveats).toEqual([]);
+    const deps3 = fakeDeps({ config: { MAX_GROUPS: 3 } });
+    const none = await loadRiskDistribution(sel(7), "region", deps3);
+    expect(deriveRiskDistribution(none.raw, sel(7), deps3.config).caveats).not.toContain("truncated");
   });
 
   it("rejects on abort", async () => {

@@ -90,10 +90,11 @@ describe("loadItemFunnel item view: alert dims (spec §9 2.1 perGroup, top-N on 
     expect(deps.source.calls.find((c) => c.method === "countOpenAlertsBy")?.args).toEqual([openAlerts(AMER), "escalated"]);
   });
 
-  it("truncated when the candidate call returns MAX_GROUPS rows", async () => {
-    const { out } = await run(7, "routingPersona", EMPTY_FILTERS, fakeDeps({ config: { MAX_GROUPS: 3 } }));
-    expect(out.caveats).toEqual(["truncated"]);
-    expect(out.status).toBe("ok");
+  it("truncated when the candidate call returns MAX_GROUPS rows (derive, from the 2.1 list; MOD-02)", async () => {
+    const deps = fakeDeps({ config: { MAX_GROUPS: 3 } });
+    const { out } = await run(7, "routingPersona", EMPTY_FILTERS, deps);
+    expect(out).toMatchObject({ status: "ok", caveats: [] });
+    expect(deriveItemFunnel(out.raw, sel(7), deps.config).caveats).toContain("truncated");
   });
 
   it("end to end with deriveItemFunnel: 2.1 total and breakdown groups", async () => {

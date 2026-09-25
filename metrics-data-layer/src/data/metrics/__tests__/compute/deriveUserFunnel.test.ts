@@ -34,7 +34,7 @@ describe("deriveUserFunnel (section 1)", () => {
 
   it("unit valueUsd falls back to counts with value-item-view-only", () => {
     const out = deriveUserFunnel(raw, sel({ unit: "valueUsd" }));
-    expect(out.data.total.unit).toBe("valueUsd");
+    expect(out.data.total.unit).toBe("count"); // SPF-01: the unit the numbers are in
     expect(out.data.total.stages[2].pctPrev).toBe(0.5);
     expect(out.caveats).toContain("value-item-view-only");
   });
@@ -88,6 +88,31 @@ describe("deriveUserFunnel (section 1)", () => {
     expect(bd?.overlapRatio).toBe(12 / 10);
     expect(out.caveats).toEqual(expect.arrayContaining(["overlap", "escalated-open-only"]));
     expect(out.caveats).not.toContain("truncated");
+  });
+
+  it("escalated: a zero-count label is dropped before top-N (COR-03); the two synthetic rows never set truncated (SPF-06)", () => {
+    const groups = {
+      "1.2": [
+        { group: "true", count: 0 },
+        { group: "false", count: 8 },
+      ],
+      "1.3": [
+        { group: "true", count: 0 },
+        { group: "false", count: 3 },
+      ],
+      "1.4": [
+        { group: "true", count: 0 },
+        { group: "false", count: 1 },
+      ],
+    };
+    // MAX_GROUPS 2 = the length of each escalated list: still no truncated (no grouped call behind them)
+    const out = deriveUserFunnel({ ...raw, dimension: "escalated", groups }, sel(), { ...SMALL, MAX_GROUPS: 2 });
+    expect(out.data.breakdown?.groups.map((g) => g.group)).toEqual(["false"]);
+    expect(out.data.breakdown?.truncated).toBeNull();
+    expect(out.caveats).not.toContain("truncated");
+    // the same list length on a real grouped call (alertType) does set truncated (MOD-02: derive decides)
+    const at = deriveUserFunnel({ ...raw, dimension: "alertType", groups }, sel(), { ...SMALL, MAX_GROUPS: 2 });
+    expect(at.caveats).toContain("truncated");
   });
 
   it("actionType and writebackType apply to one stage; missing groups → empty", () => {

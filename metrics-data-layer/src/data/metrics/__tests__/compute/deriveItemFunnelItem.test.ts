@@ -86,13 +86,36 @@ describe("deriveItemFunnel item view", () => {
     expect(out.caveats).not.toContain("escalated-open-only");
   });
 
+  it("alert dim: zero-count candidates are dropped before top-N (COR-03); truncated only from the 2.1 candidate list", () => {
+    const groups = {
+      "2.1": [
+        { group: "Planner", ...cv(18, 100) },
+        { group: "Solo", ...cv(0, 0) },
+        { group: "Logistics", ...cv(12, 100) },
+      ],
+      "2.2": [
+        { group: "Planner", ...cv(5, 10) },
+        { group: "Logistics", ...cv(4, 10) },
+      ],
+    };
+    const out = deriveItemFunnel({ ...raw, dimension: "routingPersona", groups }, sel(), SMALL);
+    expect(out.data.breakdown?.groups.map((g) => g.group)).toEqual(["Planner", "Logistics"]);
+    expect(out.data.breakdown?.truncated).toBeNull();
+    // the 2.1 list mirrors the candidate call: 3 = MAX_GROUPS (SMALL) → truncated
+    expect(out.caveats).toContain("truncated");
+    const later = { "2.1": groups["2.1"].slice(0, 1), "2.2": groups["2.2"], "2.3": groups["2.2"], "2.4": groups["2.2"] };
+    // 2.2–2.4 lists (ungrouped per-group counts) never set truncated, even with length = MAX_GROUPS = 2
+    const noCut = deriveItemFunnel({ ...raw, dimension: "routingPersona", groups: later }, sel(), { ...SMALL, MAX_GROUPS: 2 });
+    expect(noCut.caveats).not.toContain("truncated");
+  });
+
   it("escalated adds escalated-open-only; missing grouped rows give no groups", () => {
     const out = deriveItemFunnel({ ...raw, dimension: "escalated" }, sel());
     expect(out.data.breakdown?.groups).toEqual([]);
     expect(out.caveats).toEqual(expect.arrayContaining(["overlap", "breakdown-open-only", "escalated-open-only"]));
   });
 
-  it("a dim outside the item-view registry gives an empty non-additive breakdown", () => {
+  it("a dim outside the item-view registry gives an empty breakdown (loadCard rejects it earlier)", () => {
     const out = deriveItemFunnel({ ...raw, dimension: "actionType", groups: {} }, sel());
     expect(out.data.breakdown?.overlapRatio).toBeNull();
     expect(out.data.breakdown?.groups).toEqual([]);

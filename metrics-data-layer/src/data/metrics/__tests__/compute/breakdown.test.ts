@@ -10,6 +10,7 @@ import {
   isTruncatedByCap,
   rowsOutside,
   sortGroupCounts,
+  nonEmptyGroups,
   topGroups,
 } from "../../compute/breakdown";
 import { remainder } from "../../compute/stats";
@@ -128,5 +129,11 @@ describe("client-side grouping (4.2–4.6)", () => {
   it("countOfGroup returns 0 for an absent group", () => {
     expect(countOfGroup([g("a", 3)], "a")).toBe(3);
     expect(countOfGroup([g("a", 3)], "b")).toBe(0);
+  });
+});
+
+describe("nonEmptyGroups (COR-03)", () => {
+  it("drops zero-count groups and keeps the order", () => {
+    expect(nonEmptyGroups([g("a", 0), g("b", 2), g("c", 0), g("d", 1)])).toEqual([g("b", 2), g("d", 1)]);
   });
 });

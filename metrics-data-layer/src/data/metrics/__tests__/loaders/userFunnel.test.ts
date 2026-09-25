@@ -140,11 +140,13 @@ describe("loadUserFunnel (spec §9 1.1–1.4)", () => {
   it("truncated when a grouped call returns MAX_GROUPS rows; escalated pairs never count", async () => {
     const capped = fakeDeps({ config: { MAX_GROUPS: 3 } });
     // 1.2/1.3 queueFilter 7 d have 4 groups → cut to 3 = MAX_GROUPS.
+    // The loader adds no caveat (MOD-02); derive decides from the grouped lists in the raw.
     const out = await loadUserFunnel(sel(7), "queueFilter", capped);
-    expect(out.caveats).toEqual(["truncated"]);
-    expect(out.status).toBe("ok");
-    const pairs = await loadUserFunnel(sel(7), "escalated", fakeDeps({ config: { MAX_GROUPS: 2 } }));
-    expect(pairs.caveats).toEqual([]);
+    expect(out).toMatchObject({ status: "ok", caveats: [] });
+    expect(deriveUserFunnel(out.raw, sel(7), capped.config).caveats).toContain("truncated");
+    const two = fakeDeps({ config: { MAX_GROUPS: 2 } });
+    const pairs = await loadUserFunnel(sel(7), "escalated", two);
+    expect(deriveUserFunnel(pairs.raw, sel(7), two.config).caveats).not.toContain("truncated"); // SPF-06
   });
 
   it("end to end with deriveUserFunnel: 1.1–1.4 counts", async () => {

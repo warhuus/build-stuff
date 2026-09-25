@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { deriveItemFunnel } from "../../compute/deriveItemFunnel";
 import { loadItemFunnel } from "../../loaders/itemFunnel";
 import { itemFunnelSets } from "../../query/buildFunnel";
 import { DEFAULT_SELECTION, EMPTY_FILTERS } from "../../selection";
@@ -114,8 +115,10 @@ describe("loadItemFunnel item view: item dims (countItemsBy on 2.0–2.4)", () =
     expect(methods(deps).filter((m) => m === "countItems")).toHaveLength(7);
   });
 
-  it("truncated when a countItemsBy returns MAX_GROUPS rows", async () => {
-    const { out } = await run(7, "productLine", EMPTY_FILTERS, fakeDeps({ config: { MAX_GROUPS: 3 } }));
-    expect(out.caveats).toEqual(["truncated"]);
+  it("truncated (a countItemsBy returned MAX_GROUPS rows) is decided by derive, not the loader (MOD-02)", async () => {
+    const deps = fakeDeps({ config: { MAX_GROUPS: 3 } });
+    const { out } = await run(7, "productLine", EMPTY_FILTERS, deps);
+    expect(out.caveats).toEqual([]);
+    expect(deriveItemFunnel(out.raw, sel(7), deps.config).caveats).toContain("truncated");
   });
 });

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { deriveClosureComposition } from "../../compute/deriveClosureComposition";
 import { loadClosureComposition } from "../../loaders/closureComposition";
 import { closedNotOpenNow } from "../../query/build";
 import type { EventGroupField } from "../../query/specs";
@@ -120,13 +121,16 @@ describe("loadClosureComposition (spec §9 4.6; D11, D12)", () => {
 
   it("truncated when the grouped call returns MAX_GROUPS rows; row-cap from L2", async () => {
     // MAX_GROUPS 3: routingPersona at 7 has exactly 3 groups → truncated (status stays ok).
-    const out = await loadClosureComposition(sel(7), "routingPersona", fakeDeps({ config: { MAX_GROUPS: 3 } }));
-    expect(out.caveats).toEqual(["truncated"]);
-    expect(out.status).toBe("ok");
+    // The loader adds no caveat (MOD-02); derive decides from `closedTotalByGroup`.
+    const deps3 = fakeDeps({ config: { MAX_GROUPS: 3 } });
+    const out = await loadClosureComposition(sel(7), "routingPersona", deps3);
+    expect(out).toMatchObject({ status: "ok", caveats: [] });
+    expect(deriveClosureComposition(out.raw, sel(7), deps3.config).caveats).toContain("truncated");
     clearMetricsCache();
     // MAX_GROUPS 4 → 3 groups < 4 → not truncated.
-    const four = await loadClosureComposition(sel(7), "routingPersona", fakeDeps({ config: { MAX_GROUPS: 4 } }));
-    expect(four.caveats).toEqual([]);
+    const deps4 = fakeDeps({ config: { MAX_GROUPS: 4 } });
+    const four = await loadClosureComposition(sel(7), "routingPersona", deps4);
+    expect(deriveClosureComposition(four.raw, sel(7), deps4.config).caveats).not.toContain("truncated");
     clearMetricsCache();
     // ROW_CAP 5: L1("now") 66 rows → capped.
     const capped = await loadClosureComposition(sel(7), null, fakeDeps({ config: { ROW_CAP: 5, PAGE_SIZE: 5 } }));

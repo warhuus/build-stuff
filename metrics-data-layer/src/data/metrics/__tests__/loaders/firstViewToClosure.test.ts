@@ -9,9 +9,7 @@ import {
   expectCalls,
   itemsCall,
   L2_NOW_AMER_IDS,
-  L2_NOW_AMER_ITEMS,
   L2_NOW_IDS,
-  L2_NOW_ITEMS,
   l2Calls,
   sel,
 } from "./alertCardTestUtils";
@@ -52,19 +50,25 @@ describe("loadFirstViewToClosure (spec §9 4.4; D11, D12)", () => {
     expectCalls(deps.source, l2Calls(NOW, EMPTY_FILTERS));
   });
 
-  it.each(ITEM_DIMS)("item dim %s: items of every L2('now') fact (32)", async (dim) => {
+  it.each(ITEM_DIMS)("item dim %s at 30 days: items of the 4.4 population only (L5)", async (dim) => {
     const deps = fakeDeps();
     const out = await loadFirstViewToClosure(sel(30), dim, deps);
-    expect(out.raw.items?.map((i) => i.salesOrderId)).toEqual(L2_NOW_ITEMS.map(itemId));
-    expectCalls(deps.source, [...l2Calls(NOW, EMPTY_FILTERS), itemsCall(L2_NOW_ITEMS)]);
+    // Population (firstViewToClosurePopulation, 30 d start @30:12): L2("now") facts closed in the window with a
+    // first view: A42 (cl@4) I38, A43 (cl@20) I39, A44 I40, A46 I32, A49 I10, A50 I11, A53 (cl@8, view after
+    // close: excluded later as closeBeforeView but in the population) I36, A55 I14. Not A47 / A51 / A54 (never
+    // viewed), not A45 / A48 / A52 / A56 (closed before the window). Items: 8 (was all 32 fact items).
+    const expected = [10, 11, 14, 32, 36, 38, 39, 40];
+    expect(out.raw.items?.map((i) => i.salesOrderId)).toEqual(expected.map(itemId));
+    expectCalls(deps.source, [...l2Calls(NOW, EMPTY_FILTERS), itemsCall(expected)]);
   });
 
   it("AMER at 7 days with businessLine", async () => {
     const deps = fakeDeps();
     const out = await loadFirstViewToClosure(sel(7, AMER), "businessLine", deps);
     expect(idsOf(out.raw.facts)).toEqual(L2_NOW_AMER_IDS);
-    expect(out.raw.items).toHaveLength(15);
-    expectCalls(deps.source, [...l2Calls(NOW, AMER), itemsCall(L2_NOW_AMER_ITEMS)]);
+    // 7 d AMER population: A42 I38, A44 I40, A46 I32 (A49 A50 A55 are EMEA) → 3 items.
+    expect(out.raw.items).toHaveLength(3);
+    expectCalls(deps.source, [...l2Calls(NOW, AMER), itemsCall([32, 38, 40])]);
   });
 
   it("row cap with an item dim → partial + row-cap", async () => {

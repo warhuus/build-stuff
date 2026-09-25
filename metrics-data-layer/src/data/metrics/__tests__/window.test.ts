@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daysBetween, hoursBetween, inWindow, resolveWindow, toDateOnly, windowDays } from "../window";
+import { dateOnlyOrNull, daysBetween, hoursBetween, inWindow, resolveWindow, toDateOnly, windowDays } from "../window";
 
 const NOW = new Date("2026-09-24T10:30:00.000Z");
 
@@ -80,5 +80,14 @@ describe("hoursBetween / daysBetween", () => {
     expect(hoursBetween(null, "2026-09-24T00:00:00Z")).toBeNull();
     expect(daysBetween("2026-09-24T00:00:00Z", null)).toBeNull();
     expect(hoursBetween("x", "2026-09-24T00:00:00Z")).toBeNull();
+  });
+});
+
+describe("dateOnlyOrNull (spec §9 4.1 verdict dates)", () => {
+  it("keeps a date-only value, reduces a timestamp to its UTC date, null for null or unparsable", () => {
+    expect(dateOnlyOrNull("2026-09-17")).toBe("2026-09-17");
+    expect(dateOnlyOrNull("2026-09-17T23:30:00-02:00")).toBe("2026-09-18");
+    expect(dateOnlyOrNull(null)).toBeNull();
+    expect(dateOnlyOrNull("n/a")).toBeNull();
   });
 });

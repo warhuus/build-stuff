@@ -59,7 +59,7 @@ function groupedLists(groups: BucketGroups | null): readonly (readonly unknown[]
 }
 
 /**
- * 3.1 derive: total = `bucketRows(all, worked, unit)` from `riskSideTotals` of both sides; with a dim and
+ * 3.1 derive (spec §9 3.1): total = `bucketRows(all, worked, unit)` from `riskSideTotals` of both sides; with a dim and
  * both sides' groups, the additive `riskBreakdown`. Caveats: `delayed-forced-100`, `unscored-largest`
  * (always); `truncated` when top-N cut groups or a grouped call returned `MAX_GROUPS` rows; `now-all-time`
  * under "now".

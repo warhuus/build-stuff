@@ -9,7 +9,7 @@ import { deriveAlertView } from "./deriveItemFunnelAlert";
 import { deriveItemView } from "./deriveItemFunnelItem";
 
 /**
- * itemFunnel derive: `FunnelSeries` (section 2) in the selected unit plus the breakdown and caveats of
+ * itemFunnel derive (spec §9 2.0–2.4, item and alert view): `FunnelSeries` (section 2) in the selected unit plus the breakdown and caveats of
  * the loaded view (see `deriveItemView` / `deriveAlertView`).
  */
 export const deriveItemFunnel: Derive<ItemFunnelRaw, FunnelSeries> = (raw, selection, config = METRICS_CONFIG) =>

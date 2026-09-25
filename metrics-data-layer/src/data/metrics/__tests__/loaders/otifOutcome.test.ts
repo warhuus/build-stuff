@@ -128,8 +128,11 @@ describe("loadOtifOutcome (spec §9 4.1)", () => {
   });
 
   it("truncated when the totals aggregate returns exactly MAX_GROUPS groups", async () => {
-    const out = await loadOtifOutcome(sel(7, "otif"), null, fakeDeps({ config: { MAX_GROUPS: 2 } }));
-    expect(out.caveats).toEqual(["truncated"]);
+    // The loader adds no caveat; deriveOtifOutcome now checks the totals list (MOD-02).
+    const deps = fakeDeps({ config: { MAX_GROUPS: 2 } });
+    const out = await loadOtifOutcome(sel(7, "otif"), null, deps);
+    expect(out.caveats).toEqual([]);
+    expect(deriveOtifOutcome(out.raw, sel(7, "otif"), deps.config).caveats).toContain("truncated");
   });
 
   it("rejects on abort", async () => {

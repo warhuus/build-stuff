@@ -5,7 +5,7 @@ import { clearMetricsCache } from "../../shared/cache";
 import { fixtureTime as t, itemId } from "../../source/fake/fixtureAlerts";
 import type { BreakdownDimension } from "../../types";
 import { AMER, fakeDeps, idsOf, win } from "../shared/loaderDeps";
-import { expectCalls, itemsCall, L2_NOW_IDS, L2_NOW_ITEMS, l2Calls, range, sel } from "./alertCardTestUtils";
+import { expectCalls, itemsCall, L2_NOW_IDS, L2_NOW_ITEMS, l2Calls, sel } from "./alertCardTestUtils";
 
 const ALERT_DIMS: readonly BreakdownDimension[] = ["alertType", "routingPersona", "priority"];
 const ITEM_DIMS: readonly BreakdownDimension[] = ["businessLine", "productLine", "region", "plant"];
@@ -19,7 +19,10 @@ const L2_7_IDS = [
  * Their items: A09 I9, A11 I11, A13/A54 I13, A15 I15, A18 I18, A19 I19, A21/A62 I21, A25 I25, A32 I2,
  * A44 I40, A46 I32, A49 I10, A53 I36, A58 I17, A65 I24, A70 I7 → 16 distinct.
  */
-const L2_7_ITEMS = [2, 7, 9, 10, 11, 13, 15, 17, 18, 19, 21, 24, 25, 32, 36, 40];
+// 4.3 population at 7 d (raisedToFirstViewPopulation: first view, all-time, in the window; L5): of the 18 L2(7)
+// alerts A09 I9, A13 I13, A15 I15, A19 I19, A25 I25, A44 I40, A46 I32, A49 I10, A53 I36, A58 I17, A62 I21,
+// A65 I24 (12). Out: A11 (first view @18), A18 (@48), A32 (@120), A21 A54 A70 (never viewed). Items: 12.
+const POP_7_ITEMS = [9, 10, 13, 15, 17, 19, 21, 24, 25, 32, 36, 40];
 
 describe("loadRaisedToFirstView (spec §9 4.3; D11, D12)", () => {
   beforeEach(() => clearMetricsCache());
@@ -63,26 +66,31 @@ describe("loadRaisedToFirstView (spec §9 4.3; D11, D12)", () => {
     expectCalls(deps.source, l2Calls(win(7), EMPTY_FILTERS));
   });
 
-  it.each(ITEM_DIMS)("item dim %s at 7 days: items of the L2(7) facts", async (dim) => {
+  it.each(ITEM_DIMS)("item dim %s at 7 days: items of the 4.3 population only (L5)", async (dim) => {
     const deps = fakeDeps();
     const out = await loadRaisedToFirstView(sel(7), dim, deps);
-    expect(out.raw.items?.map((i) => i.salesOrderId)).toEqual(L2_7_ITEMS.map(itemId));
-    expectCalls(deps.source, [...l2Calls(win(7), EMPTY_FILTERS), itemsCall(L2_7_ITEMS)]);
+    expect(out.raw.items?.map((i) => i.salesOrderId)).toEqual(POP_7_ITEMS.map(itemId));
+    expectCalls(deps.source, [...l2Calls(win(7), EMPTY_FILTERS), itemsCall(POP_7_ITEMS)]);
   });
 
   it("item dim at 30 days and 'now'", async () => {
     const deps = fakeDeps();
     const thirty = await loadRaisedToFirstView(sel(30), "productLine", deps);
-    // L2(30) items: I2 I6 I7, I9–I19, I21 I22, I24–I26, I29, I32 I33, I36, I38–I40 = 26.
-    const items30 = [2, 6, 7, ...range(9, 19), 21, 22, 24, 25, 26, 29, 32, 33, 36, 38, 39, 40];
-    expect(thirty.raw.items).toHaveLength(26);
+    // 30 d population (24 alerts, phase3-correctness): A09 I9, A10 I10, A11 I11, A13 I13, A15 I15, A16 I16,
+    // A17 I17, A19 I19, A25 I25, A26 I26, A29 I29, A42 I38, A43 (vw@29) I39, A44 I40, A46 I32, A49 I10, A50 I11,
+    // A53 I36, A55 I14, A58 I17, A60 I19, A62 I21, A65 I24, A69 I6 → 20 distinct items.
+    const items30 = [6, 9, 10, 11, 13, 14, 15, 16, 17, 19, 21, 24, 25, 26, 29, 32, 36, 38, 39, 40];
+    expect(thirty.raw.items).toHaveLength(20);
     const now = await loadRaisedToFirstView(sel("now"), "productLine", deps);
-    expect(now.raw.items).toHaveLength(32);
+    // now: the 46 L2("now") alerts minus the 9 never viewed (A21 A22 A23 A27 A47 A51 A54 A63 A70) = 37; their
+    // items = the 32 L2 items minus I7 (A70 only), I22 (A22, A63), I23 (A23), I33 (A47) = 28.
+    const itemsNow = L2_NOW_ITEMS.filter((n) => ![7, 22, 23, 33].includes(n));
+    expect(now.raw.items).toHaveLength(28);
     expectCalls(deps.source, [
       ...l2Calls(win(30), EMPTY_FILTERS),
       itemsCall(items30),
       ...l2Calls(win("now"), EMPTY_FILTERS),
-      itemsCall(L2_NOW_ITEMS),
+      itemsCall(itemsNow),
     ]);
   });
 

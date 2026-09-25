@@ -108,7 +108,7 @@ describe("funnelSeries", () => {
     const { series, caveats } = funnelSeries({ section: 2, view: "alert", window: 30, unit: "valueUsd", generatedAt: "2026-06-01T00:00:00Z", stages });
     expect(series.firstStageId).toBe("2.1");
     expect(series.stages[2].pctFirst).toBe(0.25);
-    expect(series).toMatchObject({ section: 2, view: "alert", window: 30, unit: "valueUsd", generatedAt: "2026-06-01T00:00:00Z" });
+    expect(series).toMatchObject({ section: 2, view: "alert", window: 30, unit: "count", generatedAt: "2026-06-01T00:00:00Z" });
     expect(caveats).toEqual(["value-item-view-only"]);
   });
   it("item view: firstStageId 2.0, no caveat", () => {
