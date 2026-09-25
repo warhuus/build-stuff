@@ -165,12 +165,22 @@ cd metrics-data-layer
 npm i
 npx tsc --noEmit
 npx eslint . --max-warnings 0
-npx vitest run --coverage
+npx vitest run
 ```
 
-- Acceptance: 100% lines on `compute/`, and at least 90% overall.
-- The tests are in `src/data/metrics/__tests__/`. They run on the fake source and its fixtures (`FIXTURE_NOW`, `FIXTURES`), and on a recording OSDK client for `source/osdk`.
-- `structure.test.ts` and `layering.test.ts` enforce:
-  - the import direction and the OSDK boundary
-  - the size limits
-  - no `any`, `console` or `withProperties`
+The suite is deliberately small, about 100 tests. It covers:
+- **Metric maths** in `__tests__/compute/`: table-driven, one file per card family, with typical inputs plus null, zero and boundary cases.
+- **End-to-end** in `cards.test.ts`: one golden per card on the fake source and its fixtures.
+- **Guards** in `guards.test.ts`:
+  - toggling unit or threshold does not refetch
+  - a disallowed breakdown returns an error
+  - the row cap gives a `partial` result
+  - section 1 ignores item filters
+  - a cache hit makes no fetch
+- **Query shape** in `source/osdk/queries.test.ts`: the main query plans are compiled through a recording OSDK client. It also checks that no group-by-only property is ever filtered and that an empty id list sends no request.
+
+The structural rules are ESLint rules in `eslint.config.mjs`, not tests:
+- the import direction and the OSDK boundary
+- file, function and loader size limits
+- no `any`, `console`, default exports or `withProperties`
+- purity of `compute/`

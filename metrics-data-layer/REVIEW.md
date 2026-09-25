@@ -191,3 +191,29 @@ Residual items, recorded and not changed:
 - OSD-01, MOD-11, TYP-08 and the partial MOD items listed in §4.
 
 All §14 boxes are ticked.
+
+## 7. Test suite cut after delivery
+
+After delivery the user judged the 798-test suite bloated. Test code had grown larger than the production code: about 10,600 lines against 9,100. The user's decision, which overrides the instructions' test and coverage requirements (§11 and the §14 coverage and "checked by a test" items):
+
+- **Keep only** tests of the core metric functionality (inputs → expected outputs, with a few null, zero and boundary cases), one end-to-end golden per card, a handful of guards, and a compact check of the query shapes.
+- **Move the structural checks** into ESLint rules in `eslint.config.mjs`:
+  - `max-lines`, `max-lines-per-function`
+  - `no-restricted-imports` for the OSDK boundary and the layering
+  - `no-explicit-any`, `no-console`, `no-restricted-exports`
+  - `no-restricted-syntax` for `withProperties` and for clocks and randomness in `compute/`
+- **Delete** the tests of plumbing and infrastructure: the fake source, cache, memo and semaphore, loaders' exact call lists, hooks, selection and URL parsing, the registry, and the structure scanners.
+
+| | Before | After |
+|---|---|---|
+| Test files | 89 | 11 |
+| Test cases | 798 | 99 |
+| Test code lines | ~10,600 | ~1,550 |
+| `npx vitest run` wall time | ~41 s | ~6 s |
+
+There is no coverage target any more. The lower coverage mostly affects caching, abort and hook behaviour, where bugs show up as UI glitches rather than wrong numbers. The Foundry query shapes keep a compact recording-client check until they are verified at integration.
+
+Checks after the cut:
+- `npx tsc --noEmit`: 0 errors.
+- `npx eslint . --max-warnings 0`: clean. Each new rule was verified by adding a temporary violation.
+- `npx vitest run`: 11 files, 99 tests, all passing.
