@@ -37,3 +37,5 @@ Frozen files (change only via the lead): src/config/metrics.ts, metricsCodes.ts,
 - L2. compileWhere.ts has a local toDateOnly copy; dedupe to window.ts (rank 2, importable by source/osdk) in phase 4.
 - L3. Fixtures have 164 events, not ~300 (instructions §11 "about"); accepted for hand-checkability. Record in REVIEW.md.
 - L4. B's request for a VERDICT_DATE_PROPERTIES tuple: declined (V7 typed union already exists; fixture literal is test data, not delivered production logic... fixtures ARE delivered under source/fake — the literal "otifOtShipmentEndDate" is allowed there because it is typed as VerdictDateProperty, V7).
+- L5. 4.2/4.3/4.4 items-by-id: fetch only the POPULATION's items (spec §9 4.2 "fetch the population's items"), selected with the pure compute population functions (durations.ts raisedToClosedPopulation etc.), not all L2 facts' items. Fix in phase 4.
+- L6. Two loader envelope helpers exist (loaders/funnelLoaderOutput.ts by E1, loaders/alertCardWiring.ts loaderEnvelope by E3). Consolidate into one card-neutral loaders/loaderOutput.ts in phase 4.
