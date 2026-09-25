@@ -3,7 +3,7 @@ import { carriedPopulation } from "../../compute/deriveItemFunnelAlert";
 import { deriveItemFunnel } from "../../compute/deriveItemFunnel";
 import type { AlertViewRaw } from "../../types";
 import { NOW_ISO, SMALL, daysAgo, ev, fact, openAlert, win } from "../helpers/deriveRows";
-import { sel } from "../helpers/testKit";
+import { fromWire, sel } from "../helpers/testKit";
 
 // Human rows: a1 viewed + acted + written back; a2 viewed; a3 acted without a view; a4 write-back only (also an
 // action, source "user"); a5 viewed.
@@ -185,5 +185,6 @@ describe("deriveItemFunnel alert view", () => {
 
   it("a dim outside the alert-view registry row throws instead of computing something else (TYP-05)", () => {
     expect(() => deriveItemFunnel({ ...raw, dimension: "plant" }, sel())).toThrow(RangeError);
+    expect(() => deriveItemFunnel({ ...raw, dimension: fromWire<"plant">('"userRole"') }, sel())).toThrow(TypeError);
   });
 });

@@ -18,6 +18,7 @@ import {
   stagesForDim,
   unhandledDimension,
 } from "../breakdowns";
+import { fromWire } from "./helpers/testKit";
 import type { CardId, ItemFunnelView } from "../types";
 
 type Row = readonly [dim: string, stages: string, additive: boolean];
@@ -180,5 +181,9 @@ describe("registry guards (MOD-04, TYP-05)", () => {
   it("the never arm throws at run time for an unknown value", () => {
     const unknown = "userRole" as never;
     expect(() => unhandledDimension(unknown)).toThrow(TypeError);
+  });
+
+  it("eventGroupFieldOf rejects a dimension from outside the type system", () => {
+    expect(() => eventGroupFieldOf(fromWire<"plant">('"userRole"'))).toThrow(TypeError);
   });
 });

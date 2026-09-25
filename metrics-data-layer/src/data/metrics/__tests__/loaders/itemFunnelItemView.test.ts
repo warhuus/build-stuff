@@ -121,4 +121,8 @@ describe("loadItemFunnel item view: item dims (countItemsBy on 2.0–2.4)", () =
     expect(out.caveats).toEqual([]);
     expect(deriveItemFunnel(out.raw, sel({ view: "item", window: 7 }), deps.config).caveats).toContain("truncated");
   });
+
+  it("a dim outside the item-view registry row rejects with RangeError (TYP-05; loadCard never passes one)", async () => {
+    await expect(loadItemFunnel(sel({ view: "item", window: 7 }), "actionType", fakeDeps())).rejects.toBeInstanceOf(RangeError);
+  });
 });

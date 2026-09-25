@@ -100,21 +100,21 @@ Severities are as the reviewers gave them. "Fixed" means the change is in the tr
 | MOD-16 | minor | Redundant id filters | Removed | yes |
 | MOD-17 | minor | Key builders copied | One `memoKey`. Card-key labels unchanged | partly |
 | MOD-18 | minor | Dead code | `sumNullable`, `emptyBucketAmounts`, `clamped` removed. `bucketOf` kept (spec §12.2 seam). `WINDOW_OPTIONS`, `MOUNT_ORDER` and `HumanEvent` kept (config and spec types) | partly |
-| MOD-19 | minor | Duplicated test helpers | Shared helpers | G4 |
-| MOD-20 | minor | Gaps in layering and purity scanners | Hardened | G4 |
+| MOD-19 | minor | Duplicated test helpers | Shared helpers | yes (G4) |
+| MOD-20 | minor | Gaps in layering and purity scanners | Hardened | yes (G4) |
 | STR-01 | major | Host `chunk` re-created | Imported from `src/lib/osdk.ts` via `source/batching.ts` | yes (G2) |
-| STR-02 | major | No CAVEAT_TEXT test | `config.test.ts` | G4 |
-| STR-03 | minor | Scanner regex gaps | Hardened | G4 |
+| STR-02 | major | No CAVEAT_TEXT test | `config.test.ts` | yes (G4) |
+| STR-03 | minor | Scanner regex gaps | Hardened | yes (G4) |
 | STR-04 | minor | §4 names not used | `deriveFunnel`, `itemsOpenInWindow`, `percent` | yes (G1) |
 | STR-05 | minor | Same name, different contracts | Renamed or de-duplicated (e.g. `compileRiskCondition`) | yes |
 | STR-06 | minor | Added files not justified | Accepted; justified in §5 | n/a |
 | STR-07 | minor | Stub load and derive lived in `catalogue.ts` | `loaders/blocked.ts`, `compute/deriveStub.ts` | yes (G1) |
-| STR-08 | minor | Test tree did not mirror the source | Renamed and moved | G4 |
+| STR-08 | minor | Test tree did not mirror the source | Renamed and moved | yes (G4) |
 | STR-09 | minor | Extra tsconfig `types` | Kept `["node"]` for the Node-based scanner tests; `vitest/globals` removed (tests import from vitest) | yes (lead) |
 | STR-10 | minor | JSDoc citations and null behaviour | Added | yes |
 | OSD-01 | minor | Some fetches select more columns than the spec | Accepted: port frozen, bandwidth only. Row mapping drops open alerts without `salesOrderId` (D15) | n/a |
 | OSD-02 | minor | Unbounded per-candidate aggregates | `runLimited(INNER_CONCURRENCY)` | yes (G1) |
-| OSD-03 | minor | Real builders never compiled in OSDK tests | `planChains.test.ts` | G4 |
+| OSD-03 | minor | Real builders never compiled in OSDK tests | `planChains.test.ts` | yes (G4) |
 | TYP-01 | major | `MetricResult` optional-field soup | Union on `status` | yes (G3) |
 | TYP-02 | major | Selection updater lost queued updates | Latest-selection ref | yes (G3) |
 | TYP-03 | major | = SPF-04 | as SPF-04 | yes (G3) |
@@ -123,20 +123,20 @@ Severities are as the reviewers gave them. "Fixed" means the change is in the tr
 | TYP-06 | minor | Inline provider props restarted loads | Memoised environment; `now` may be a function | yes (G3) |
 | TYP-07 | minor | Abort error text inconsistent | "aborted" everywhere. Errors stay strings (spec §10) | yes (G3) |
 | TYP-08 | minor | Dependent fields not tied in types | Accepted: spec §10 shapes | n/a |
-| TST-01 | blocker | No CAVEAT_TEXT test | `config.test.ts` | G4 |
-| TST-02 | major | Real plans never compiled | `planChains.test.ts` | G4 |
-| TST-03 | major | Derived outputs thin on fixtures | Fixture end-to-end tests | G4 |
-| TST-04 | minor | Windows 14 and 90 not tested for some cards | Added | G4 |
-| TST-05 | minor | Sentinel and length-only checks in the alert-view test | Replaced with exact values | G4 |
-| TST-06 | minor | EventSet `intersect` and OpenAlertSet `union`/`subtract` never compiled | Added | G4 |
-| TST-07 | minor | `any` scanner gaps | Hardened | G4 |
-| TST-08 | minor | Weak assertions | Replaced with exact values | G4 |
-| TST-09 | minor | No row-fetch sweep (D20) | Sweep test | G4 |
-| TST-10 | minor | Derive dimension loops covered only `plant` | All allowed dimensions | G4 |
-| TST-11 | minor | Some fixture paths never fire | Unit tests (fixture data unchanged) | G4 |
-| TST-12 | minor | Test depended on the real clock | Fixed clock | G4 |
+| TST-01 | blocker | No CAVEAT_TEXT test | `config.test.ts` | yes (G4) |
+| TST-02 | major | Real plans never compiled | `planChains.test.ts` | yes (G4) |
+| TST-03 | major | Derived outputs thin on fixtures | Fixture end-to-end tests | yes (G4) |
+| TST-04 | minor | Windows 14 and 90 not tested for some cards | Added | yes (G4) |
+| TST-05 | minor | Sentinel and length-only checks in the alert-view test | Replaced with exact values | yes (G4) |
+| TST-06 | minor | EventSet `intersect` and OpenAlertSet `union`/`subtract` never compiled | Added | yes (G4) |
+| TST-07 | minor | `any` scanner gaps | Hardened | yes (G4) |
+| TST-08 | minor | Weak assertions | Replaced with exact values | yes (G4) |
+| TST-09 | minor | No row-fetch sweep (D20) | Sweep test | yes (G4) |
+| TST-10 | minor | Derive dimension loops covered only `plant` | All allowed dimensions | yes (G4) |
+| TST-11 | minor | Some fixture paths never fire | Unit tests (fixture data unchanged) | yes (G4) |
+| TST-12 | minor | Test depended on the real clock | Fixed clock | yes (G4) |
 
-"G4" in the Fixed column means the test fixer's outcome is listed in §6.
+Test-side fixes by G4 are detailed in `process/phase4-G4.md`.
 
 ## 5. Files added beyond the §4 tree (STR-06)
 
@@ -166,4 +166,28 @@ Instructions §4 allows these inside the existing folders.
 
 ## 6. Final check results
 
-FINAL_RESULTS_PLACEHOLDER
+Run on the finished tree (lead, phase 4):
+
+| Acceptance item (instructions §14) | Result |
+|---|---|
+| `npx tsc --noEmit` | 0 errors |
+| `npx eslint . --max-warnings 0` | 0 errors, 0 warnings |
+| `npx vitest run --coverage` | 89 files, 798 tests, all passing |
+| Coverage, overall | lines 100% (4629/4629), statements 100%, functions 100% (566/566), branches 99.15% (1867/1883) |
+| Coverage, `compute/` | lines 100% (1420/1420), statements 100%, functions 100% (182/182), branches 98.81% (664/672) |
+| Every card reachable through `useMetric` and `loadCard` with its `T` | `__tests__/loadCard*.test.ts`, `hooks/useMetric.test.ts` (`expectTypeOf` for all 12 cards) |
+| Only `source/osdk` imports `@osdk/client`, `@app/sdk` or `client` | `__tests__/structure.test.ts` (syntax-tree import scan) |
+| No file over 250 lines; functions ≤ 40; loaders ≤ 150 | `structure.test.ts`, `layering.test.ts` |
+| No `withProperties`, no `any` outside the OSDK boundary, no `console.*` | `structure.test.ts` |
+| Every caveat code used has text in `CAVEAT_TEXT` | `__tests__/config.test.ts` |
+| QUESTIONS.md lists every remaining placeholder and the P2 deviations | `ALERT_APP_ID` and `VERDICT_DATE_PROPERTY` (the only config values equal to `PLACEHOLDER`); P2 a–e copied verbatim |
+| `.deliveryignore` lists the stubs; delivered `src/` has no stub | `.deliveryignore` = `src/client.ts`, `src/lib/osdk.ts`, `stubs/` |
+
+The uncovered branches are defensive guards: `?? 0` on OSDK reads, the `never` arms in exhaustive switches reached only through invalid input, and the alert view's `facts ?? []` / `openAlerts ?? []`. The last two are unreachable since COR-01 (both are always loaded), but the frozen `AlertViewRaw` types keep them nullable, so the fallbacks stay.
+
+Residual items, recorded and not changed:
+- The `RangeError` guards in `loaders/userFunnel.ts` cannot be reached, because loadCard rejects other dims first. The comment now says so.
+- The fake source keeps its own call recorder next to the test wrapper. Merging them would need a production interceptor.
+- OSD-01, MOD-11, TYP-08 and the partial MOD items listed in §4.
+
+All §14 boxes are ticked.

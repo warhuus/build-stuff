@@ -4,7 +4,8 @@ import {
   deriveRaisedToClosed,
   deriveRaisedToFirstView,
 } from "../../compute/deriveDurations";
-import type { BreakdownDimension, DurationRaw, WindowKey } from "../../types";
+import { allowedBreakdowns, isItemDim } from "../../breakdowns";
+import type { DurationRaw, WindowKey } from "../../types";
 import { SMALL, daysAgo, fact, item, win } from "../helpers/deriveRows";
 import { sel } from "../helpers/testKit";
 
@@ -77,14 +78,38 @@ describe("deriveRaisedToClosed (4.2)", () => {
     expect(out.caveats).toContain("truncated");
   });
 
-  it("item-dim breakdown via the items fetched by id", () => {
-    const rows = [fact("a1", { salesOrderId: "s1" }), fact("a2", { salesOrderId: "s2" }), fact("a3", { salesOrderId: null })];
-    const dims: BreakdownDimension[] = ["plant"];
-    for (const dimension of dims) {
-      const out = deriveRaisedToClosed(raw({ facts: rows, dimension, items: [item("s1", { plant: "X" }), item("s2", { plant: "X" })] }), sel());
-      expect(out.data.breakdown?.groups.map((g) => [g.group, g.data.series[0].n])).toEqual([["X", 2]]);
-      expect(out.data.breakdown?.other?.series[0].n).toBe(1);
-      expect(out.caveats).not.toContain("truncated");
+  it("every registry dim of 4.2–4.4 groups the population (TST-10: allowedBreakdowns, attrs and items)", () => {
+    // Values per dim: a1 → V1 (1 alert), a2 + a3 → V2 (2 alerts), a4 → null attrs and no item → other.
+    const V1 = { alertType: "A", routingPersona: "P1", priority: "High", businessLine: "BL1", productLine: "PL1", region: "R1", plant: "P01" };
+    const V2 = { alertType: "B", routingPersona: "P2", priority: "Low", businessLine: "BL2", productLine: "PL2", region: "R2", plant: "P02" };
+    const at = (v: typeof V1) => ({ alertType: v.alertType, routingPersona: v.routingPersona, priority: v.priority });
+    const seen = { firstViewAt: daysAgo(1.5) };
+    const facts = [
+      fact("a1", { ...seen, salesOrderId: "s1", attrs: at(V1) }),
+      fact("a2", { ...seen, salesOrderId: "s2", attrs: at(V2) }),
+      fact("a3", { ...seen, salesOrderId: "s2", attrs: at(V2) }),
+      fact("a4", { ...seen, salesOrderId: null, attrs: { alertType: null, routingPersona: null, priority: null } }),
+    ];
+    const items = [item("s1", V1), item("s2", V2)];
+    const derives = [
+      ["raisedToClosed", deriveRaisedToClosed],
+      ["raisedToFirstView", deriveRaisedToFirstView],
+      ["firstViewToClosure", deriveFirstViewToClosure],
+    ] as const;
+    for (const [card, derive] of derives) {
+      const dims = allowedBreakdowns(card, "item");
+      expect(dims).toHaveLength(7);
+      for (const dimension of dims) {
+        if (!(dimension in V1)) throw new Error(`unexpected dim ${dimension}`);
+        const key = dimension as keyof typeof V1;
+        const out = derive(raw({ facts, dimension, items: isItemDim(dimension) ? items : null }), sel());
+        expect(out.data.breakdown?.groups.map((g) => [g.group, g.data.series[0].n]), `${card} ${dimension}`).toEqual([
+          [V2[key], 2],
+          [V1[key], 1],
+        ]);
+        expect(out.data.breakdown?.other?.series[0].n, `${card} ${dimension}`).toBe(1);
+        expect(out.data.breakdown).toMatchObject({ additive: true, truncated: null, overlapRatio: null });
+      }
     }
   });
 });

@@ -28,6 +28,10 @@ const byId = (rows: readonly VerdictRow[]): string[] => rows.map((r) => r.otifOr
 const WORKED_7 = [2, 7, 9, 10, 11, 13, 15, 17, 18, 19, 21, 24, 25, 32, 36, 40];
 const WORKED_30 = [...WORKED_7, 6, 12, 14, 16, 22, 26, 29, 33, 38, 39];
 const WORKED_NOW = [...WORKED_30, 3, 20, 23, 31, 34, 35];
+// 14 d: 7 d + I6 (A69 @10) I14 (A55 @8) I16 (A16 @12, A28 @10) I26 (A26 @11) I29 (A29 @9) I38 (A42 @11) = 22.
+const WORKED_14 = [...WORKED_7, 6, 14, 16, 26, 29, 38];
+// 90 d: the "now" set minus I3 (A33's only view is @200) = 31.
+const WORKED_90 = [...WORKED_30, 20, 23, 31, 34, 35];
 
 describe("loadOtifOutcome (spec §9 4.1)", () => {
   it("7 d otif: totals, worked ids, their verdicts (both modes' fields); 3 port calls", async () => {
@@ -74,6 +78,25 @@ describe("loadOtifOutcome (spec §9 4.1)", () => {
     const crit = await loadOtifOutcome(sel({ window: 30, otifMode: "crit" }), null, fakeDeps());
     // Crit: CRIT 1001 1009 1011 1031 1038 9001 9004 = 7; Not CRIT 1025 9002 = 2.
     expect(byGroup(crit.raw.totals)).toEqual([{ group: "CRIT", count: 7 }, { group: "Not CRIT", count: 2 }]);
+  });
+
+  it("14 d and 90 d, both modes (TST-04)", async () => {
+    const run = (window: 14 | 90, otifMode: "otif" | "crit") => loadOtifOutcome(sel({ window, otifMode }), null, fakeDeps());
+    const o14 = await run(14, "otif");
+    // Otif, [08-18, 09-01]: OTIF 1001 1009 1015 1031 9001 = 5; Not OTIF 1011 (08-20) 1038 = 2 (9002 08-15 too old).
+    expect(byGroup(o14.raw.totals)).toEqual([{ group: "Not OTIF", count: 2 }, { group: "OTIF", count: 5 }]);
+    expect(o14.raw.workedIds).toEqual(ids(WORKED_14));
+    expect(byId(o14.raw.verdicts)).toEqual(ids([9, 11, 15, 25, 32, 38, 40]));
+    // Crit: CRIT 1001 1009 1011 1031 1038 9001 9004 = 7; Not CRIT 1025 = 1 (1015 and 9003 gated out).
+    expect(byGroup((await run(14, "crit")).raw.totals)).toEqual([{ group: "CRIT", count: 7 }, { group: "Not CRIT", count: 1 }]);
+    const o90 = await run(90, "otif");
+    // Otif, [06-03, 09-01]: 30 d + 1032 (07-15) → OTIF 6; Not OTIF 1011 1038 9002 = 3 (1040 05-01 too old).
+    expect(byGroup(o90.raw.totals)).toEqual([{ group: "Not OTIF", count: 3 }, { group: "OTIF", count: 6 }]);
+    expect(o90.raw.workedIds).toEqual(ids(WORKED_90));
+    // + 1031 (I31 worked via A45 @69).
+    expect(byId(o90.raw.verdicts)).toEqual(ids([9, 11, 15, 25, 31, 32, 38, 40]));
+    // Crit: 30 d + 1032 CRIT → CRIT 8; Not CRIT 1025 9002 = 2.
+    expect(byGroup((await run(90, "crit")).raw.totals)).toEqual([{ group: "CRIT", count: 8 }, { group: "Not CRIT", count: 2 }]);
   });
 
   it('"now", both modes: no lower date bound, worked ids all-time', async () => {

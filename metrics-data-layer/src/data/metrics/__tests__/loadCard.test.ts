@@ -42,16 +42,31 @@ describe("loadCard: every card, typed by card id (instructions §7)", () => {
     expectTypeOf(closure).toEqualTypeOf<MetricResult<CardData<CompositionResult>>>();
     for (const r of [userFunnel, itemFunnel, risk, otif, r2c, r2v, v2c, ageing, closure]) {
       expect(r.status).toBe("ok");
-      expect(r.data).toBeDefined();
       expect(r.computedAt).toBe(FIXTURE_NOW.toISOString());
       expect(r.window).toEqual(resolveWindow(7, FIXTURE_NOW));
     }
-    // Spot checks against the loader findings (phase2-E3: 4.2 at 7 d → worked 6; 4.6 at 7 d → 9 closed).
-    expect(userFunnel.data?.total.view).toBe("user");
-    expect(itemFunnel.data?.total.stages.map((st) => st.id)).toEqual(["2.0", "2.1", "2.2", "2.3", "2.4"]);
+    // One hand-derived headline per card at 7 d (working: process/phase3-correctness.md table; the duration,
+    // backlog and composition cards are derived in full in loadCardDurations/loadCardBacklog.test.ts).
+    // 1.1 u1 u2 u4 = 3; 1.2 u1 u3 u4 u2 u5 = 5; 1.3 = 5; 1.4 u1 (A25 wb) = 1.
+    expect(userFunnel.data?.total.stages.map((st) => st.count)).toEqual([null, 3, 5, 5, 1]);
+    // 2.0 I1–I26, I28–I32 = 31; 2.1 29; 2.2 11; 2.3 7; 2.4 1.
+    expect(itemFunnel.data?.total.stages.map((st) => st.count)).toEqual([31, 29, 11, 7, 1]);
+    // 3.1: 7 buckets × worked/not worked, zero-filled; all-bucket counts sum to the 30 evaluated open items.
     expect(risk.data?.total).toHaveLength(14);
-    expect(r2c.data?.total.series.find((x) => x.key === "worked")?.n).toBe(6);
+    expect(risk.data?.total.reduce((s, row) => s + row.count, 0)).toBe(30);
+    // 4.1 otif: worked verdicts 1009 1015 (both OTIF) → 2 / 2; not worked (5 + 1) − 2 = 4, made 5 − 2 = 3;
+    // 16 worked ids − 6 with a verdict row = 10 missing.
+    expect(otif.data?.total).toEqual({
+      mode: "otif", workedRate: 1, notWorkedRate: 0.75, workedN: 2, notWorkedN: 4, workedMade: 2, notWorkedMade: 3, missingVerdict: 10,
+    });
+    // 4.2 worked A42 A44 A46 A49 A50 A55 = 6; 4.3 first view in 7 d: A09 A13 A15 A19 A25 A44 A46 A49 A53 A58 A62
+    // A65 = 12; 4.4 A42 A44 A46 A49 A50 A55 = 6; 4.5 age > 30 = 16; 4.6 closed in 7 d = 9.
+    expect(r2c.data?.total.series.map((x) => [x.key, x.n])).toEqual([["worked", 6], ["notWorked", 2]]);
+    expect(r2v.data?.total.series.map((x) => x.n)).toEqual([12]);
+    expect(v2c.data?.total.series.map((x) => x.n)).toEqual([6]);
+    expect(ageing.data?.total.threshold.alerts).toBe(16);
     expect(closure.data?.total.closedTotal).toBe(9);
+    expect(userFunnel.data?.total.view).toBe("user");
   });
 
   it("types the stub cards' results", async () => {
@@ -66,9 +81,9 @@ describe("loadCard: every card, typed by card id (instructions §7)", () => {
 
   it("unions loader, derive and stage caveats in config order", async () => {
     const r = await loadCard("itemFunnel", sel({ window: 7 }), null, opts());
-    // Stage caveats of the item view: 2.0 proxy, 2.3 not-a-conversion, 2.4 low-volume, 2.1 build-stamp (≤ 7 d).
-    expect(r.caveats).toEqual(expect.arrayContaining(["proxy", "not-a-conversion", "low-volume", "build-stamp"]));
-    expect(new Set(r.caveats).size).toBe(r.caveats.length);
+    // Stage caveats of the item view: 2.0 proxy, 2.3 not-a-conversion, 2.4 low-volume, 2.1 build-stamp (≤ 7 d),
+    // unioned once each in CAVEATS order (proxy < not-a-conversion < low-volume < build-stamp).
+    expect(r.caveats).toEqual(["proxy", "not-a-conversion", "low-volume", "build-stamp"]);
     const stage = r.data?.total.stages.find((st) => st.id === "2.0");
     expect(stage?.caveats).toContain("proxy");
   });
@@ -99,7 +114,10 @@ describe("loadCard: cache (spec §11, Appendix A O3)", () => {
     expect(value.data?.total.unit).toBe("valueUsd");
     expect(ageing30.data?.total.threshold.days).toBe(30);
     expect(ageing7.data?.total.threshold.days).toBe(7);
-    expect(ageing7.data?.total.threshold.alerts).toBeGreaterThan(ageing30.data?.total.threshold.alerts ?? 0);
+    // Ages (d + 0.25 for op@d): > 30 → 16 alerts; > 7 → 29 (A59 is exactly 7.0 d old and is not counted; the
+    // 29 are the bins from [8,9) on: 1+1+1+2+1+1+2+1+2+1 + 7+7+2). Working: loadCardBacklog.test.ts.
+    expect(ageing30.data?.total.threshold.alerts).toBe(16);
+    expect(ageing7.data?.total.threshold.alerts).toBe(29);
   });
 
   it("section 1 ignores item filters: same cache entry, caveat filters-not-applied", async () => {

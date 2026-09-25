@@ -52,8 +52,9 @@ async function escalatedGroups(stage: EventStageId, w: Window, source: MetricsSo
 /**
  * Grouped users of one applicable stage (spec §9 1.1 queueFilter via AppUsageEvent; 1.2–1.4 per dim): 1.1 is
  * applicable to queueFilter only (registry); escalated by the two escalated counts; every other dim by its
- * AlertHistory group field (`eventGroupFieldOf`, exhaustive). A dim with no field on 1.2–1.4 (item dims, not
- * in the section-1 registry row) throws `RangeError` instead of computing something else (TYP-05).
+ * AlertHistory group field (`eventGroupFieldOf`, exhaustive). A dim outside the section-1 registry row never
+ * reaches this function: loadCard rejects it (`breakdown-not-allowed`) and `stagesForDim` yields no stages. The
+ * `RangeError` branches are a defensive guard so such a dim can never compute something else (TYP-05).
  */
 async function stageGroups(
   stage: UserStageId,

@@ -27,9 +27,13 @@ describe("loadCard: errors, abort, concurrency, progress", () => {
 
   it("defaults config and now (a stub is blocked at the current time, no calls)", async () => {
     const source = createFakeSource();
+    // Bounded by the real clock read around the call (TST-12: no dependence on the machine's date).
+    const before = Date.now();
     const r = await loadCard("rolledValue", sel(), null, { source });
+    const after = Date.now();
     expect(r.status).toBe("blocked");
-    expect(Date.parse(r.computedAt)).toBeGreaterThan(FIXTURE_NOW.getTime());
+    expect(Date.parse(r.computedAt)).toBeGreaterThanOrEqual(before);
+    expect(Date.parse(r.computedAt)).toBeLessThanOrEqual(after);
     expect(source.calls).toEqual([]);
   });
 
@@ -89,10 +93,15 @@ describe("loadCard: errors, abort, concurrency, progress", () => {
   it("reports cumulative progress across fetches and puts the last value on the result", async () => {
     const seen: Progress[] = [];
     const r = await loadCard("raisedToClosed", sel({ window: 7 }), null, { ...opts(), onProgress: (p) => seen.push(p) });
-    expect(seen.length).toBeGreaterThan(0);
     expect(r.progress).toEqual(seen[seen.length - 1]);
     const loaded = seen.map((p) => p.loaded);
     expect([...loaded].sort((a, b) => a - b)).toEqual(loaded);
+    // Rows fetched by 4.2 at 7 d (no item dim, so no itemsById): L2("now") = L1 human events 66 (every human
+    // token) + the chain 149 (the 164 events minus 13 on the 8 untouched items I1 I4 I5 I8 I27 I28 I30 I37 minus
+    // A19 `up` and A24 `ag`) + touched-and-open 31 (46 touched − 15 closed A42–A56); not-worked closed events in
+    // 7 d 9 (A35 A36 A40 A42 A44 A46 A49 A50 A55; A31 is open again) + opened events of their items 13 (A10 A11
+    // A14 A35 A36 A42 A44 A45 A46 A49 A50 A53 A55; A40 has none) = 268.
+    expect(r.progress).toEqual({ loaded: 268 });
   });
 });
 

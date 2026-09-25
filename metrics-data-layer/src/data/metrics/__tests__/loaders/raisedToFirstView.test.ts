@@ -5,13 +5,13 @@ import { clearMetricsCache } from "../../shared/cache";
 import { fixtureTime as t, itemId } from "../../source/fake/fixtureAlerts";
 import type { BreakdownDimension } from "../../types";
 import { AMER, fakeDeps, idsOf, win } from "../helpers/loaderDeps";
-import { expectCalls, itemsCall, L2_NOW_IDS, L2_NOW_ITEMS, l2Calls } from "../helpers/alertCards";
+import { expectCalls, itemsCall, L2_NOW_IDS, L2_NOW_ITEMS, l2Calls, TOUCHED_IDS } from "../helpers/alertCards";
 import { sel } from "../helpers/testKit";
 
 const ALERT_DIMS: readonly BreakdownDimension[] = ["alertType", "routingPersona", "priority"];
 const ITEM_DIMS: readonly BreakdownDimension[] = ["businessLine", "productLine", "region", "plant"];
 
-/** L2(7): the 18 alerts with a human event since 08-25 12:00 (phase2-D2 hand-check). */
+/** L2(7): the 18 alerts with a human event since 08-25 12:00 (working: TOUCHED_IDS in helpers/alertCards.ts). */
 const L2_7_IDS = [
   "A09", "A11", "A13", "A15", "A18", "A19", "A21", "A25", "A32", "A44", "A46", "A49", "A53", "A54", "A58", "A62",
   "A65", "A70",
@@ -46,10 +46,17 @@ describe("loadRaisedToFirstView (spec §9 4.3; D11, D12)", () => {
     // Human token with d ≤ 29: A09 A10 A11 A13 A15–A19 A21 A22 A25–A29 A32 A42 A43 (vw@29:09 is after the
     // 08-02 12:00 start) A44 A46 A47 A49–A51 A53–A55 A58 A60 A62 A65 A69 A70 = 34. Out: A12 @35, A14 @92,
     // A20 @65, A23 @33, A30 @59, A33 @200, A45 @69, A48 @44, A52 @58, A56 @130, A63 @43, A67 @87.
-    expect(out.raw.facts).toHaveLength(34);
-    expect(idsOf(out.raw.facts)).not.toContain("A23");
-    expect(idsOf(out.raw.facts)).toContain("A43");
+    expect(idsOf(out.raw.facts)).toEqual(TOUCHED_IDS[30]);
     expectCalls(deps.source, l2Calls(win(30), EMPTY_FILTERS));
+  });
+
+  it.each([14, 90] as const)("%s days: L2 over the selected window = its touched alerts (TST-04)", async (key) => {
+    const deps = fakeDeps();
+    const out = await loadRaisedToFirstView(sel({ window: key }), null, deps);
+    // 14 d: 27 alerts, 90 d: 43 alerts; working in TOUCHED_IDS (helpers/alertCards.ts).
+    expect(idsOf(out.raw.facts)).toEqual(TOUCHED_IDS[key]);
+    expect(out.raw).toMatchObject({ window: win(key), dimension: null, notWorked: null, items: null });
+    expectCalls(deps.source, l2Calls(win(key), EMPTY_FILTERS));
   });
 
   it("'now': all 46 touched alerts", async () => {
@@ -98,7 +105,7 @@ describe("loadRaisedToFirstView (spec §9 4.3; D11, D12)", () => {
   it("AMER at 7 days with plant", async () => {
     const deps = fakeDeps();
     const out = await loadRaisedToFirstView(sel({ window: 7, filters: AMER }), "plant", deps);
-    // L2(7) AMER: A21 A25 A44 A46 A53 A62 A65 (phase2-D2). Items: I21 (A21, A62), I25, I40, I32, I36, I24.
+    // L2(7) AMER: the L2(7) alerts on I21–I40 (not I29): A21 A25 A44 A46 A53 A62 A65. Items: I21 (A21, A62), I25, I40, I32, I36, I24.
     expect(idsOf(out.raw.facts)).toEqual(["A21", "A25", "A44", "A46", "A53", "A62", "A65"]);
     expectCalls(deps.source, [...l2Calls(win(7), AMER), itemsCall([21, 24, 25, 32, 36, 40])]);
   });

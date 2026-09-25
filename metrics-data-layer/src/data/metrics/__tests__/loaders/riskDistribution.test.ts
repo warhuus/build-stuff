@@ -75,6 +75,24 @@ describe("loadRiskDistribution (spec §9 3.1, D17)", () => {
     expect(out.raw).toEqual({ window: win(30), dimension: null, all: ALL, worked });
   });
 
+  it("14 d and 90 d (TST-04)", async () => {
+    // Worked 14 d = 7 d set + I6 (A69 vw@10) I14 (A55 vw@8) I16 (A16, A28) I26 (A26 @11) I29 (A29 vw@9) = 18
+    // (I12's A51 @19 and I22's A22 @15 are older). unscored I6 I7 I16 I18 I24 = 71k; b15_30 I15 I17 I26 = 58k;
+    // b31_50 I2 I19 = 21k; b51_70 I9 I10 I21 I29 = 40k; b71_90 I11 = 11k; b91_100 I13 I25 = 38k; delayed I14 = 14k.
+    // Total 18, 71+58+21+40+11+38+14 = 253k; ranges 3, 2, 4, 1, 2.
+    const w14 = side(18, [3, 2, 4, 1, 2], 1, 253000, [[3, 58000], [2, 21000], [4, 40000], [1, 11000], [2, 38000], [1, 14000]]);
+    expect((await loadRiskDistribution(sel({ window: 14 }), null, fakeDeps())).raw).toEqual({
+      window: win(14), dimension: null, all: ALL, worked: w14,
+    });
+    // Worked 90 d = the "now" set minus I3 (A33's only view is @200) = 22: unscored I6 I7 I16 I18 I20 I24 = 91k;
+    // b15_30 I15 I17 I26 = 58k; b31_50 21k; b51_70 40k; b71_90 I11 I12 I23 = 46k; b91_100 38k; delayed I14 I22 = 36k.
+    // Total 22, 91+58+21+40+46+38+36 = 330k; ranges 3, 2, 4, 3, 2.
+    const w90 = side(22, [3, 2, 4, 3, 2], 2, 330000, [[3, 58000], [2, 21000], [4, 40000], [3, 46000], [2, 38000], [2, 36000]]);
+    expect((await loadRiskDistribution(sel({ window: 90 }), null, fakeDeps())).raw).toEqual({
+      window: win(90), dimension: null, all: ALL, worked: w90,
+    });
+  });
+
   it('"now": worked is all-time (W3)', async () => {
     const out = await loadRiskDistribution(sel({ window: "now" }), null, fakeDeps());
     // Worked now: unscored I6 I7 I16 I18 I20 I24 = 91k; b15_30 I3 I15 I17 I26 = 61k; b31_50 I2 I19 = 21k;

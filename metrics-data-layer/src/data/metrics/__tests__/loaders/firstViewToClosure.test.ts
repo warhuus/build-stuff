@@ -15,7 +15,7 @@ const ITEM_DIMS: readonly BreakdownDimension[] = ["businessLine", "productLine",
 describe("loadFirstViewToClosure (spec §9 4.4; D11, D12)", () => {
   beforeEach(() => clearMetricsCache());
 
-  it.each([7, 30, "now"] as const)("%s: L2('now') facts whatever the window; raw window = selection", async (key) => {
+  it.each([7, 14, 30, 90, "now"] as const)("%s: L2('now') facts whatever the window; raw window = selection", async (key) => {
     const deps = fakeDeps();
     const out = await loadFirstViewToClosure(sel({ window: key }), null, deps);
     // D12: the derive filters closedAt in the selected window; the loader always loads the 46 L2("now") alerts.

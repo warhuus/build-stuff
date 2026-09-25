@@ -12,7 +12,8 @@ describe("fixture dataset invariants (instructions §11)", () => {
     expect(ALERTS).toHaveLength(70);
     expect(FIXTURES.openAlerts).toHaveLength(48);
     expect(FIXTURES.risk).toHaveLength(30);
-    expect(FIXTURES.events.length).toBeGreaterThan(150);
+    // One event per ALERTS script token: 164 (lead note L3: fewer than the ~300 of instructions §11, accepted).
+    expect(FIXTURES.events).toHaveLength(164);
   });
 
   it("has no opened/closed event before PIPELINE_EVENTS_START and no event after now", () => {

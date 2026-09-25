@@ -1,22 +1,16 @@
 // @vitest-environment node
-import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { BLOCKED_REASONS, CAVEATS, INTEGRATION_KEYS } from "../../../config/metricsCodes";
 import { CARD_META, CAVEAT_TEXT, INTEGRATION_UNBLOCKED_BY } from "../../../config/metricsText";
 import { CARDS } from "../catalogue";
 import { stubBlocked } from "../loaders/blocked";
+import { PRODUCTION, SRC } from "./helpers/sourceTree";
 
 // Spec §13 "Config" rows and instructions §14 acceptance "Every caveat code used anywhere has text in
 // CAVEAT_TEXT. Checked by a test" (TST-01 / STR-02).
-const SRC = fileURLToPath(new URL("../../../", import.meta.url));
-const walk = (dir: string): string[] =>
-  readdirSync(dir).flatMap((n) => (statSync(join(dir, n)).isDirectory() ? walk(join(dir, n)) : [join(dir, n)]));
-const PRODUCTION = [join(SRC, "config"), join(SRC, "data", "metrics")]
-  .flatMap(walk)
-  .filter((f) => /\.tsx?$/.test(f) && !f.includes("__tests__"));
+const FILES = PRODUCTION.map((f) => f.abs);
 const KNOWN: ReadonlySet<string> = new Set(Object.keys(CAVEAT_TEXT));
 const isText = (s: unknown): boolean => typeof s === "string" && s.trim().length > 0;
 
@@ -54,7 +48,7 @@ describe("config texts (spec §13 Config)", () => {
 
 /** String literals whose contextual type is a caveat-code union: every literal used as a caveat. */
 function caveatLiterals(): { readonly where: string; readonly text: string }[] {
-  const program = ts.createProgram(PRODUCTION, {
+  const program = ts.createProgram(FILES, {
     strict: true,
     noEmit: true,
     target: ts.ScriptTarget.ES2020,
@@ -73,7 +67,7 @@ function caveatLiterals(): { readonly where: string; readonly text: string }[] {
     return literals.length > 0 && literals.every((u) => u.isStringLiteral() && KNOWN.has(u.value));
   };
   const found: { where: string; text: string }[] = [];
-  for (const file of PRODUCTION) {
+  for (const file of FILES) {
     const sf = program.getSourceFile(file);
     if (sf === undefined) throw new Error(`not in program: ${file}`);
     const visit = (node: ts.Node): void => {
@@ -101,8 +95,7 @@ function caveatShapedLiterals(): { readonly where: string; readonly text: string
     }
     return false;
   };
-  for (const file of PRODUCTION) {
-    const sf = ts.createSourceFile(file, ts.sys.readFile(file) ?? "", ts.ScriptTarget.ES2020, true);
+  for (const { abs: file, ast: sf } of PRODUCTION) {
     const visit = (node: ts.Node): void => {
       if (ts.isStringLiteral(node) && /^[a-z0-9]+(-[a-z0-9]+)+$/.test(node.text) && inCaveatSlot(node)) {
         found.push({ where: `${file.slice(SRC.length)}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`, text: node.text });

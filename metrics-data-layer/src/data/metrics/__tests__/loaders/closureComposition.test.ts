@@ -27,9 +27,11 @@ const byGroup = (rows: readonly GroupCount[] | null): GroupCount[] =>
 //  7 d: A35 P/LateGI/High, A36 Lg/CreditBlock/Medium, A40 CS/CreditBlock/High, A42 P/LateGI/High,
 //       A44 CS/Allocation/Low, A46 Lg/LateGI/High, A49 Lg/LateGI/Low, A50 P/LateGI/High, A55 Lg/LateGI/Medium
 //       (A31 cl@6 is open again → out) = 9.
+// 14 d: + A37 @12, A41 @9, A47 @11, A53 @8, A54 @13 = 14.
 // 30 d: + A37 @12 CS/Allocation/Low, A38 @25 P/LateGI/Urgent, A41 @9 P/Allocation/Medium, A43 @20
 //       Lg/CreditBlock/Medium, A47 @11 P/CreditBlock/Urgent, A51 @15 Lg/Allocation/Medium, A53 @8 P/LateGI/Medium,
 //       A54 @13 Lg/CreditBlock/High = 17.
+// 90 d: + A39 @60, A45 @50, A48 @32, A52 @55 = 21 (A56 @100 is older).
 // now: + A39 @60 Lg/LateGI/Unclassified, A45 @50 P/LateGI/Low, A48 @32 CS/Allocation/Medium,
 //       A52 @55 CS/CreditBlock/Low, A56 @100 CS/LateGI/Medium = 22.
 describe("loadClosureComposition (spec §9 4.6; D11, D12)", () => {
@@ -37,7 +39,9 @@ describe("loadClosureComposition (spec §9 4.6; D11, D12)", () => {
 
   it.each([
     [7, 9],
+    [14, 14],
     [30, 17],
+    [90, 21],
     ["now", 22],
   ] as const)("%s: closedTotal %i, facts = L2('now'), no grouped call", async (key, total) => {
     const deps = fakeDeps();

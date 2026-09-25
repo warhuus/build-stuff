@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { deriveAgeingBacklog } from "../../compute/deriveAgeingBacklog";
-import type { AgeingBacklogRaw, BreakdownDimension } from "../../types";
+import { allowedBreakdowns, isItemDim } from "../../breakdowns";
+import type { AgeingBacklogRaw } from "../../types";
 import { NOW_ISO, SMALL, daysAgo, ev, item, openAlert, win } from "../helpers/deriveRows";
 import { sel } from "../helpers/testKit";
 
@@ -70,15 +71,30 @@ describe("deriveAgeingBacklog (4.5)", () => {
     expect(out.data.breakdown?.other?.openAlerts).toBe(1);
   });
 
-  it("item-dim breakdown from the alert's item, no overlap caveat", () => {
-    const dims: BreakdownDimension[] = ["plant"];
+  it("every registry dim of 4.5 (TST-10): alert dims from the alert row, item dims from its item", () => {
+    // a1, a2 → V2 (2 alerts); a3 → V1 (1); a4 → null alert fields and an unknown item → other.
+    const V1 = { routingPersona: "P1", priority: "High", alertType: "T1", escalated: "true", businessLine: "BL1", productLine: "PL1", region: "R1", plant: "P01" };
+    const V2 = { routingPersona: "P2", priority: "Low", alertType: "T2", escalated: "false", businessLine: "BL2", productLine: "PL2", region: "R2", plant: "P02" };
+    const alertOf = (id: string, so: string, v: typeof V1 | null) =>
+      openAlert(id, { salesOrderId: so, persona: v?.routingPersona ?? null, priority: v?.priority ?? null, riskType: v?.alertType ?? null, escalated: v === null ? null : v.escalated === "true" });
+    const raw: AgeingBacklogRaw = {
+      ...base,
+      alerts: [alertOf("a1", "s2", V2), alertOf("a2", "s2", V2), alertOf("a3", "s1", V1), alertOf("a4", "s9", null)],
+      items: [item("s1", V1), item("s2", V2)],
+    };
+    const dims = allowedBreakdowns("ageingBacklog", "item");
+    expect(dims).toHaveLength(8);
     for (const dimension of dims) {
-      const out = deriveAgeingBacklog({ ...base, dimension }, sel());
-      expect(out.data.breakdown?.groups.map((g) => [g.group, g.data.openAlerts])).toEqual([
-        ["X", 3],
-        ["Y", 1],
+      if (!(dimension in V1)) throw new Error(`unexpected dim ${dimension}`);
+      const key = dimension as keyof typeof V1;
+      const out = deriveAgeingBacklog({ ...raw, dimension }, sel());
+      expect(out.data.breakdown?.groups.map((g) => [g.group, g.data.openAlerts]), dimension).toEqual([
+        [V2[key], 2],
+        [V1[key], 1],
       ]);
-      expect(out.caveats).not.toContain("overlap");
+      expect(out.data.breakdown?.other?.openAlerts, dimension).toBe(1);
+      expect(out.caveats.includes("overlap"), dimension).toBe(!isItemDim(dimension));
     }
   });
+
 });

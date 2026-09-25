@@ -12,6 +12,7 @@ import {
   openAlertKeyOf,
 } from "../../compute/dimValues";
 import { fact, item, openAlert } from "../helpers/deriveRows";
+import { fromWire } from "../helpers/testKit";
 
 describe("dimValues", () => {
   it("reads item dims", () => {
@@ -70,5 +71,14 @@ describe("dimValues", () => {
     expect(factKeyOf("plant", [item("s1", { plant: "Z" })])(f)).toBe("Z");
     expect(factKeyOf("plant", null)(f)).toBeNull();
     expect(factKeyOf("escalated", null)(f)).toBeNull();
+  });
+
+  it("the never arms throw TypeError for a dimension from outside the type system (TYP-05)", () => {
+    const bogus = fromWire<"alertType">('"userRole"');
+    const f = fact("a1");
+    expect(() => attrsDimValue(f.attrs, bogus)).toThrow(TypeError);
+    expect(() => openAlertDimValue(openAlert("a"), bogus, METRICS_CONFIG)).toThrow(TypeError);
+    expect(() => factKeyOf(bogus, null)).toThrow(TypeError);
+    expect(() => openAlertKeyOf(bogus, itemsById([]), METRICS_CONFIG)).toThrow(TypeError);
   });
 });

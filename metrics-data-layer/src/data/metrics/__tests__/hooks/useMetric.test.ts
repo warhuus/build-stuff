@@ -221,6 +221,7 @@ describe("useMetric: errors and blocked cards never throw", () => {
       wrapper: wrapperFor(createFakeSource()),
     });
     await waitFor(() => expect(result.current.status).toBe("ok"));
-    expect(result.current.progress?.loaded).toBeGreaterThan(0);
+    // 4.2 at 7 d fetches 268 rows in all (working: loadCardRuntime.test.ts, progress case).
+    expect(result.current.progress).toEqual({ loaded: 268 });
   });
 });
