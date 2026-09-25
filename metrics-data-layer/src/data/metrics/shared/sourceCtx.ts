@@ -75,12 +75,3 @@ export function withCallProgress(source: MetricsSource, onDelta: (rows: number) 
 export function depsWithSignal(deps: LoaderDeps, signal: AbortSignal): LoaderDeps {
   return { ...deps, signal };
 }
-
-/**
- * Distinct ids, sorted by UTF-16 code unit (locale-independent), for deterministic output and id lookups.
- * @param ids ids in any order, duplicates allowed.
- * @returns a new sorted array without duplicates; empty input → empty array.
- */
-export function sortedDistinct(ids: Iterable<string>): string[] {
-  return [...new Set(ids)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-}

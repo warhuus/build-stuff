@@ -16,7 +16,7 @@ import type {
 import { daysBetween } from "../window";
 import { assignBin, countBins, zeroFilledBins } from "./bins";
 import { compareTimestamps } from "./eventPredicates";
-import { percent } from "./stats";
+import { clampNonNegative, percent, sumBy } from "./stats";
 
 /**
  * `raised(a)` per alert (spec §4): the earliest `eventTimestamp` of its opened events. The rows are the
@@ -50,7 +50,7 @@ export function agedAlerts(
 ): AgedAlert[] {
   return alerts.map((alert) => {
     const days = daysBetween(raisedAt.get(alert.riskAlertId) ?? null, asOf);
-    return { alert, ageDays: days === null ? null : Math.max(0, days) };
+    return { alert, ageDays: days === null ? null : clampNonNegative(days) };
   });
 }
 
@@ -120,7 +120,7 @@ export function thresholdTiles(
 ): AgeingThreshold {
   const past = aged.filter((entry) => entry.ageDays !== null && entry.ageDays > days);
   const pastItems = new Set(past.map((entry) => entry.alert.salesOrderId));
-  const valueUsd = [...pastItems].reduce((total, id) => total + itemValue(id, items), 0);
+  const valueUsd = sumBy([...pastItems], (id) => itemValue(id, items));
   return { days, alerts: past.length, valueUsd, pct: percent(past.length, knownAges(aged).length) };
 }
 

@@ -4,7 +4,7 @@
  */
 import type { MetricsConfig } from "../../../config/metrics";
 import type { BreakdownDimension, BreakdownResult, GroupCount } from "../types";
-import { compareCodeUnits, safeDivide, sumBy } from "./stats";
+import { clampNonNegative, compareCodeUnits, safeDivide, sumBy } from "./stats";
 
 /**
  * Sort order of breakdown groups: count descending, then group name ascending (instructions §5 rule 11).
@@ -25,7 +25,7 @@ export function sortGroupCounts(counts: readonly GroupCount[]): GroupCount[] {
  * Callers pass `config.BREAKDOWN_MAX_GROUPS` (Appendix A V3).
  */
 export function topGroups(counts: readonly GroupCount[], max: number): GroupCount[] {
-  return sortGroupCounts(counts).slice(0, Math.max(0, max));
+  return sortGroupCounts(counts).slice(0, clampNonNegative(max));
 }
 
 /**

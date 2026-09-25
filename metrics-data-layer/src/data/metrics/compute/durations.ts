@@ -15,6 +15,7 @@ import type {
 } from "../types";
 import { hoursBetween, inWindow } from "../window";
 import { countBins, quantileFromBins } from "./bins";
+import { clampNonNegative, sumBy } from "./stats";
 
 /** A series with the number of its durations that were negative and clamped to 0. */
 export interface ClampedSeries {
@@ -29,7 +30,7 @@ export interface ClampedSeries {
  */
 export function durationSeries(key: DurationSeriesKey, hours: readonly number[], config: MetricsConfig): ClampedSeries {
   const clampedNegative = hours.filter((value) => value < 0).length;
-  const bins = countBins(hours.map((value) => Math.max(0, value)), config.DURATION_EDGES_HOURS);
+  const bins = countBins(hours.map(clampNonNegative), config.DURATION_EDGES_HOURS);
   return {
     series: {
       key,
@@ -82,7 +83,7 @@ export function durationResult(
   return {
     series: built.map((entry) => entry.series),
     excluded: plan.exclusions.map((reason) => ({ reason, count: excludedCounts.get(reason) ?? 0 })),
-    clampedNegative: built.reduce((total, entry) => total + entry.clampedNegative, 0),
+    clampedNegative: sumBy(built, (entry) => entry.clampedNegative),
   };
 }
 

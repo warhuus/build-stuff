@@ -3,6 +3,7 @@
  * Bins are `[binStart, binEnd)`; the last bin is open-ended (`binEnd: null`). Units are the caller's
  * (hours for durations, days for ages). Pure.
  */
+import { sumBy } from "./stats";
 
 /** One bin range: `[start, end)`, `end` null on the open-ended last bin. */
 export interface BinRange {
@@ -63,7 +64,7 @@ export function countBins(values: readonly number[], edges: readonly number[]): 
  * Null when n = 0, when that bin is the open-ended last bin, or when no bin qualifies (q ≤ 0).
  */
 export function quantileFromBins(bins: readonly CountedBin[], q: number): number | null {
-  const n = bins.reduce((total, bin) => total + bin.count, 0);
+  const n = sumBy(bins, (bin) => bin.count);
   if (n === 0) return null;
   const target = q * n;
   let before = 0;
