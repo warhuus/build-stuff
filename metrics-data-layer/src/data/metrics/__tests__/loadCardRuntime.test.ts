@@ -1,18 +1,17 @@
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { CARD_IMPL } from "../catalogue";
 import { loadCard, peekCard } from "../loadCard";
-import { DEFAULT_SELECTION } from "../selection";
 import { clearMetricsCache } from "../shared/cache";
 import { withCallProgress } from "../shared/sourceCtx";
 import { appSemaphore } from "../shared/concurrency";
 import { createFakeSource } from "../source/fake/fakeSource";
 import { FIXTURE_CONFIG, FIXTURE_NOW } from "../source/fake/fixtures";
 import type { MetricsSource } from "../source/MetricsSource";
-import type { CardData, FunnelSeries, MetricResult, Progress, Selection } from "../types";
-import { wrapSource } from "./loadCardTestUtils";
+import type { CardData, FunnelSeries, MetricResult, Progress } from "../types";
+import { wrapSource } from "./helpers/wrapSource";
+import { sel } from "./helpers/testKit";
 
 const opts = (source: MetricsSource = createFakeSource()) => ({ source, now: FIXTURE_NOW, config: FIXTURE_CONFIG });
-const sel = (over: Partial<Selection> = {}): Selection => ({ ...DEFAULT_SELECTION, ...over });
 
 beforeEach(() => {
   clearMetricsCache();

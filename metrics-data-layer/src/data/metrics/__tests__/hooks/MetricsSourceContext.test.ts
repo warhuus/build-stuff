@@ -4,16 +4,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { METRICS_CONFIG } from "../../../../config/metrics";
 import { MetricsSourceProvider, useMetricsEnvironment, useMetricsSource } from "../../hooks/MetricsSourceContext";
 import { useMetric } from "../../hooks/useMetric";
-import { DEFAULT_SELECTION } from "../../selection";
 import { clearMetricsCache } from "../../shared/cache";
 import { createFakeSource } from "../../source/fake/fakeSource";
 import { FIXTURE_CONFIG, FIXTURE_NOW } from "../../source/fake/fixtures";
 import { getDefaultOsdkSource } from "../../source/osdk/defaultSource";
-import type { Selection } from "../../types";
-import { wrapSource } from "../loadCardTestUtils";
-import { deferred, flush } from "../shared/deferred";
-
-const sel = (over: Partial<Selection> = {}): Selection => ({ ...DEFAULT_SELECTION, ...over });
+import { wrapSource } from "../helpers/wrapSource";
+import { deferred, flush } from "../helpers/deferred";
+import { sel } from "../helpers/testKit";
 
 beforeEach(() => {
   clearMetricsCache();

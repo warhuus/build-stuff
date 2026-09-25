@@ -1,17 +1,9 @@
 /** Test helper for the section-4 alert card loaders (4.2–4.6): selections, expected port calls, fixture ids. */
 import { expect } from "vitest";
 import { closedNotOpenNow, humanEvents, openedEventsOfItemsOf, touchedEventsChain, touchedOpenAlerts } from "../../query/build";
-import { DEFAULT_SELECTION, EMPTY_FILTERS } from "../../selection";
 import { itemId } from "../../source/fake/fixtureAlerts";
 import type { FakeCall, FakeSource } from "../../source/fake/fakeSource";
-import type { ItemFilters, Selection, Window, WindowKey } from "../../types";
-
-/** Default selection with a window key and filters. */
-export const sel = (window: WindowKey, filters: ItemFilters = EMPTY_FILTERS): Selection => ({
-  ...DEFAULT_SELECTION,
-  window,
-  filters,
-});
+import type { ItemFilters, Window } from "../../types";
 
 /** The three port calls of one L2 run (L1 human events, the chain, the touched open alerts). */
 export const l2Calls = (w: Window, f: ItemFilters): FakeCall[] => [

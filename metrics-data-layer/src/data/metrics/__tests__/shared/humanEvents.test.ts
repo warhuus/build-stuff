@@ -4,7 +4,7 @@ import { clearMetricsCache } from "../../shared/cache";
 import { loadHumanEvents } from "../../shared/humanEvents";
 import { memoKey } from "../../shared/memo";
 import { EMPTY_FILTERS } from "../../selection";
-import { AMER, callCount, fakeDeps, idsOf, win } from "./loaderDeps";
+import { AMER, callCount, fakeDeps, idsOf, win } from "../helpers/loaderDeps";
 
 // Human tokens (fixtureAlerts.ts): vw ac rs es dl wb wt wr; `up` and `ag` are not human.
 describe("loadHumanEvents (L1, spec §9.0.1)", () => {

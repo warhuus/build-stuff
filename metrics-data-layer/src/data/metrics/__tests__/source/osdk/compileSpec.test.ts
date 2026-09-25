@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 import type { EventSet, ItemSet, OpenAlertSet, RiskSet } from "../../../query/specs";
 import { buildPredicates, tsIn } from "../../../source/osdk/compileWhere";
 import { isAllItems } from "../../../source/osdk/compileSpec";
-import { chainOf, type Step } from "./recordingClient";
-import { NO_FILTERS, SOME_FILTERS, TEST_CONFIG, W7, WNOW, makeCtx, setup } from "./osdkTestUtils";
+import { chainOf, type Step } from "../../helpers/recordingClient";
+import { NO_FILTERS, SOME_FILTERS, TEST_CONFIG, W7, WNOW, makeCtx, setup } from "../../helpers/osdkHarness";
 
 const PRED = buildPredicates(TEST_CONFIG);
 const FILTER_WHERE = { $and: [{ businessLineName: { $in: ["BL1"] } }, { iscRegionName: { $in: ["EU", "NA"] } }] };

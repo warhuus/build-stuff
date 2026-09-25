@@ -1,16 +1,7 @@
 // Small hand-built rows and selections for the derive tests (no fixtures).
 import { METRICS_CONFIG } from "../../../../config/metrics";
 import type { MetricsConfig } from "../../../../config/metrics";
-import { DEFAULT_SELECTION } from "../../selection";
-import type {
-  AlertEventRow,
-  AlertLifecycleRow,
-  ItemRow,
-  OpenAlertRow,
-  Selection,
-  Window,
-  WindowKey,
-} from "../../types";
+import type { AlertEventRow, AlertLifecycleRow, ItemRow, OpenAlertRow, Window, WindowKey } from "../../types";
 import { resolveWindow } from "../../window";
 
 export const NOW = new Date("2026-09-24T12:00:00.000Z");
@@ -18,9 +9,6 @@ export const NOW_ISO = NOW.toISOString();
 
 /** Window resolved at NOW (7 d: start 2026-09-17T12:00Z). */
 export const win = (key: WindowKey): Window => resolveWindow(key, NOW);
-
-/** Default selection with overrides. */
-export const sel = (overrides: Partial<Selection> = {}): Selection => ({ ...DEFAULT_SELECTION, ...overrides });
 
 /** Config with small group caps: top-2 shown, MAX_GROUPS 3. */
 export const SMALL: MetricsConfig = { ...METRICS_CONFIG, BREAKDOWN_MAX_GROUPS: 2, MAX_GROUPS: 3 };

@@ -3,15 +3,15 @@ import { deriveItemFunnel } from "../../compute/deriveItemFunnel";
 import { loadItemFunnel } from "../../loaders/itemFunnel";
 import { openAlerts } from "../../query/build";
 import { itemFunnelSets, stageWithOpenAlertWhere } from "../../query/buildFunnel";
-import { DEFAULT_SELECTION, EMPTY_FILTERS } from "../../selection";
-import type { BreakdownDimension, ItemFilters, ItemViewRaw, Selection, WindowKey } from "../../types";
-import { AMER, fakeDeps, win } from "../shared/loaderDeps";
+import { EMPTY_FILTERS } from "../../selection";
+import type { BreakdownDimension, ItemViewRaw, WindowKey } from "../../types";
+import { AMER, fakeDeps, win } from "../helpers/loaderDeps";
+import { sel } from "../helpers/testKit";
 
-const sel = (window: WindowKey, filters: ItemFilters = EMPTY_FILTERS): Selection => ({ ...DEFAULT_SELECTION, window, view: "item", filters });
 const g = (group: string, count: number, k: number) => ({ group, count, valueUsd: k * 1000 });
 type Deps = ReturnType<typeof fakeDeps>;
 async function run(window: WindowKey, dim: BreakdownDimension, filters = EMPTY_FILTERS, deps: Deps = fakeDeps()) {
-  const out = await loadItemFunnel(sel(window, filters), dim, deps);
+  const out = await loadItemFunnel(sel({ view: "item", window: window, filters: filters }), dim, deps);
   if (out.raw.view !== "item") throw new Error("expected item view");
   const raw: ItemViewRaw = out.raw;
   return { out, raw, deps };
@@ -94,12 +94,12 @@ describe("loadItemFunnel item view: alert dims (spec §9 2.1 perGroup, top-N on 
     const deps = fakeDeps({ config: { MAX_GROUPS: 3 } });
     const { out } = await run(7, "routingPersona", EMPTY_FILTERS, deps);
     expect(out).toMatchObject({ status: "ok", caveats: [] });
-    expect(deriveItemFunnel(out.raw, sel(7), deps.config).caveats).toContain("truncated");
+    expect(deriveItemFunnel(out.raw, sel({ view: "item", window: 7 }), deps.config).caveats).toContain("truncated");
   });
 
   it("end to end with deriveItemFunnel: 2.1 total and breakdown groups", async () => {
     const { out } = await run(7, "routingPersona");
-    const data = deriveItemFunnel(out.raw, sel(7)).data;
+    const data = deriveItemFunnel(out.raw, sel({ view: "item", window: 7 })).data;
     expect(data.total.stages.map((s) => s.count)).toEqual([31, 29, 11, 7, 1]);
     expect(data.breakdown?.groups.map((b) => b.group)).toEqual(["Planner", "Logistics", "CustomerService"]);
   });

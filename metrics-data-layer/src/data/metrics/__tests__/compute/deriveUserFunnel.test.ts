@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { deriveUserFunnel } from "../../compute/deriveUserFunnel";
 import { EMPTY_FILTERS } from "../../selection";
 import type { UserFunnelRaw } from "../../types";
-import { NOW_ISO, SMALL, sel, win } from "./deriveTestUtils";
+import { NOW_ISO, SMALL, win } from "../helpers/deriveRows";
+import { sel } from "../helpers/testKit";
 
 const raw: UserFunnelRaw = {
   window: win(30),

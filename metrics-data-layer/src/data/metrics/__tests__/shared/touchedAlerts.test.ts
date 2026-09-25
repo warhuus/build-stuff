@@ -6,7 +6,7 @@ import { memoKey } from "../../shared/memo";
 import { EMPTY_FILTERS } from "../../selection";
 import { fixtureTime as t } from "../../source/fake/fixtureAlerts";
 import type { AlertLifecycleRow } from "../../types";
-import { AMER, fakeDeps, idsOf, win } from "./loaderDeps";
+import { AMER, fakeDeps, idsOf, win } from "../helpers/loaderDeps";
 
 const row = (rows: readonly AlertLifecycleRow[], id: string): AlertLifecycleRow | undefined =>
   rows.find((r) => r.riskAlertId === id);

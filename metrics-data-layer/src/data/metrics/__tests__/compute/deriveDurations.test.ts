@@ -5,7 +5,8 @@ import {
   deriveRaisedToFirstView,
 } from "../../compute/deriveDurations";
 import type { BreakdownDimension, DurationRaw, WindowKey } from "../../types";
-import { SMALL, daysAgo, fact, item, sel, win } from "./deriveTestUtils";
+import { SMALL, daysAgo, fact, item, win } from "../helpers/deriveRows";
+import { sel } from "../helpers/testKit";
 
 const raw = (overrides: Partial<DurationRaw> = {}, key: WindowKey = 7): DurationRaw => ({
   window: win(key),

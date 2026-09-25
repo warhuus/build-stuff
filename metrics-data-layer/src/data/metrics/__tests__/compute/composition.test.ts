@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compositionBreakdown, compositionOf } from "../../compute/composition";
-import { SMALL, fact } from "./deriveTestUtils";
+import { SMALL, fact } from "../helpers/deriveRows";
 
 const attrs = (alertType: string | null) => ({ alertType, routingPersona: "P", priority: "H" });
 

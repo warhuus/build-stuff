@@ -2,16 +2,16 @@ import { describe, expect, it } from "vitest";
 import { deriveItemFunnel } from "../../compute/deriveItemFunnel";
 import { loadItemFunnel } from "../../loaders/itemFunnel";
 import { itemFunnelSets } from "../../query/buildFunnel";
-import { DEFAULT_SELECTION, EMPTY_FILTERS } from "../../selection";
-import type { BreakdownDimension, CountValue, ItemFilters, ItemViewRaw, Selection, WindowKey } from "../../types";
-import { AMER, fakeDeps, win } from "../shared/loaderDeps";
+import { EMPTY_FILTERS } from "../../selection";
+import type { BreakdownDimension, CountValue, ItemViewRaw, WindowKey } from "../../types";
+import { AMER, fakeDeps, win } from "../helpers/loaderDeps";
+import { sel } from "../helpers/testKit";
 
-const sel = (window: WindowKey, filters: ItemFilters = EMPTY_FILTERS): Selection => ({ ...DEFAULT_SELECTION, window, view: "item", filters });
 const cv = (count: number, k: number): CountValue => ({ count, valueUsd: k * 1000 });
 const g = (group: string, count: number, k: number) => ({ group, count, valueUsd: k * 1000 });
 type Deps = ReturnType<typeof fakeDeps>;
 async function run(window: WindowKey, dim: BreakdownDimension | null, filters = EMPTY_FILTERS, deps: Deps = fakeDeps()) {
-  const out = await loadItemFunnel(sel(window, filters), dim, deps);
+  const out = await loadItemFunnel(sel({ view: "item", window: window, filters: filters }), dim, deps);
   if (out.raw.view !== "item") throw new Error("expected item view");
   const raw: ItemViewRaw = out.raw;
   return { out, raw, deps };
@@ -119,6 +119,6 @@ describe("loadItemFunnel item view: item dims (countItemsBy on 2.0–2.4)", () =
     const deps = fakeDeps({ config: { MAX_GROUPS: 3 } });
     const { out } = await run(7, "productLine", EMPTY_FILTERS, deps);
     expect(out.caveats).toEqual([]);
-    expect(deriveItemFunnel(out.raw, sel(7), deps.config).caveats).toContain("truncated");
+    expect(deriveItemFunnel(out.raw, sel({ view: "item", window: 7 }), deps.config).caveats).toContain("truncated");
   });
 });

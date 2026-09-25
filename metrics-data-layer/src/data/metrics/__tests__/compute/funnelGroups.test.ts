@@ -10,7 +10,7 @@ import {
   stagesFor,
 } from "../../compute/funnelGroups";
 import type { FunnelContext } from "../../compute/funnelGroups";
-import { NOW_ISO, SMALL } from "./deriveTestUtils";
+import { NOW_ISO, SMALL } from "../helpers/deriveRows";
 
 const ctx: FunnelContext = { section: 2, view: "item", window: 30, unit: "count", generatedAt: NOW_ISO };
 

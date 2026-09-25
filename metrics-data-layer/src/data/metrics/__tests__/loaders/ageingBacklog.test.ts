@@ -6,8 +6,9 @@ import { clearMetricsCache } from "../../shared/cache";
 import { fixtureTime as t, itemId } from "../../source/fake/fixtureAlerts";
 import type { FakeCall } from "../../source/fake/fakeSource";
 import type { BreakdownDimension, ItemFilters } from "../../types";
-import { AMER, fakeDeps, idsOf, win } from "../shared/loaderDeps";
-import { expectCalls, range, sel } from "./alertCardTestUtils";
+import { AMER, fakeDeps, idsOf, win } from "../helpers/loaderDeps";
+import { expectCalls, range } from "../helpers/alertCards";
+import { sel } from "../helpers/testKit";
 
 const DIMS: readonly BreakdownDimension[] = [
   "alertType", "routingPersona", "priority", "escalated", "businessLine", "productLine", "region", "plant",
@@ -25,7 +26,7 @@ describe("loadAgeingBacklog (spec §9 4.5, L3; D11, D18 A9)", () => {
 
   it.each([30, "now"] as const)("%s: the three L3 fetches; window echoed, asOf = now", async (key) => {
     const deps = fakeDeps();
-    const out = await loadAgeingBacklog(sel(key), null, deps);
+    const out = await loadAgeingBacklog(sel({ window: key }), null, deps);
     expect(idsOf(out.raw.alerts)).toEqual(OPEN_IDS);
     // Opened events: one op each for A01–A28 and A57–A70 (42), two for A29–A31 (6), none for A32–A34 → 48.
     expect(out.raw.openedEvents).toHaveLength(48);
@@ -43,7 +44,7 @@ describe("loadAgeingBacklog (spec §9 4.5, L3; D11, D18 A9)", () => {
 
   it.each(DIMS)("dim %s: same three fetches (client-side breakdown), no itemsById", async (dim) => {
     const deps = fakeDeps();
-    const out = await loadAgeingBacklog(sel(30), dim, deps);
+    const out = await loadAgeingBacklog(sel({ window: 30 }), dim, deps);
     expect(out.raw.dimension).toBe(dim);
     expect(out.raw.alerts).toHaveLength(48);
     expectCalls(deps.source, l3Calls(EMPTY_FILTERS));
@@ -51,7 +52,7 @@ describe("loadAgeingBacklog (spec §9 4.5, L3; D11, D18 A9)", () => {
 
   it.each([30, "now"] as const)("AMER at %s: 12 alerts / 12 opened / 6 items", async (key) => {
     const deps = fakeDeps();
-    const out = await loadAgeingBacklog(sel(key, AMER), "escalated", deps);
+    const out = await loadAgeingBacklog(sel({ window: key, filters: AMER }), "escalated", deps);
     // Open alerts on I21–I40 (not I29): A21–A26 (I21–I26) and A62–A67 (I21–I26); each has one op.
     expect(idsOf(out.raw.alerts)).toEqual([...range(21, 26), ...range(62, 67)].map((n) => `A${n}`));
     expect(out.raw.openedEvents).toHaveLength(12);
@@ -61,7 +62,7 @@ describe("loadAgeingBacklog (spec §9 4.5, L3; D11, D18 A9)", () => {
 
   it("row cap → partial + row-cap", async () => {
     // 48 open alerts ≥ ROW_CAP 10.
-    const out = await loadAgeingBacklog(sel(30), null, fakeDeps({ config: { ROW_CAP: 10, PAGE_SIZE: 10 } }));
+    const out = await loadAgeingBacklog(sel({ window: 30 }), null, fakeDeps({ config: { ROW_CAP: 10, PAGE_SIZE: 10 } }));
     expect(out.status).toBe("partial");
     expect(out.caveats).toEqual(["row-cap"]);
   });

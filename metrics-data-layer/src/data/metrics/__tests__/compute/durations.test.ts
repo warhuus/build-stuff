@@ -13,7 +13,7 @@ import {
   raisedToFirstViewPopulation,
 } from "../../compute/durations";
 import type { DurationPlan } from "../../compute/durations";
-import { daysAgo, fact, win } from "./deriveTestUtils";
+import { daysAgo, fact, win } from "../helpers/deriveRows";
 
 const binCount = (bins: readonly { binStart: number; count: number }[], start: number): number =>
   bins.find((b) => b.binStart === start)?.count ?? -1;

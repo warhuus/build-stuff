@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { itemsForDim, salesOrderIdsOf } from "../../loaders/alertCardWiring";
 import type { AlertLifecycleRow } from "../../types";
-import { fakeDeps } from "../shared/loaderDeps";
+import { fakeDeps } from "../helpers/loaderDeps";
 
 describe("salesOrderIdsOf / itemsForDim", () => {
   it("collects non-null ids of every list", () => {

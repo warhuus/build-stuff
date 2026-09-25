@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { deriveRiskDistribution } from "../../compute/deriveRiskDistribution";
 import type { GroupCountValue, RiskBucketId, RiskDistributionRaw, RiskSideRaw } from "../../types";
-import { SMALL, sel, win } from "./deriveTestUtils";
+import { SMALL, win } from "../helpers/deriveRows";
+import { sel } from "../helpers/testKit";
 
 const cv = (count: number, valueUsd: number) => ({ count, valueUsd });
 const noGroups = (): Record<RiskBucketId, GroupCountValue[]> => ({

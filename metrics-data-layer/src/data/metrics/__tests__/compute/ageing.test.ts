@@ -10,7 +10,7 @@ import {
   thresholdTiles,
 } from "../../compute/ageing";
 import { itemsById } from "../../compute/dimValues";
-import { NOW_ISO, daysAgo, ev, item, openAlert } from "./deriveTestUtils";
+import { NOW_ISO, daysAgo, ev, item, openAlert } from "../helpers/deriveRows";
 
 describe("raisedAtByAlert", () => {
   it("takes the earliest opened timestamp per alert", () => {

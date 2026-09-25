@@ -11,7 +11,7 @@ import { loadItemFunnel } from "../loaders/itemFunnel";
 import { loadUserFunnel } from "../loaders/userFunnel";
 import { DEFAULT_SELECTION } from "../selection";
 import type { CardData, FunnelSeries, FunnelStage } from "../types";
-import { fakeDeps } from "./shared/loaderDeps";
+import { fakeDeps } from "./helpers/loaderDeps";
 
 const stage = (id: FunnelStage["id"], caveats: FunnelStage["caveats"]): FunnelStage => ({
   id,

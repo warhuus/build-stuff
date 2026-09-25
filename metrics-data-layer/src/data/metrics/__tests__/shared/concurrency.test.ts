@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { appSemaphore, createSemaphore, runLimited } from "../../shared/concurrency";
-import { deferred, flush } from "./deferred";
+import { deferred, flush } from "../helpers/deferred";
 
 describe("createSemaphore", () => {
   it("rejects invalid slot counts", () => {

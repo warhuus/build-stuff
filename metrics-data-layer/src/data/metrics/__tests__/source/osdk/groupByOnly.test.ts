@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { EventGroupField, EventPredicate, EventSet, OpenAlertCondition, RiskCondition } from "../../../query/specs";
-import { whereFieldsOn } from "./recordingClient";
-import { SOME_FILTERS, W7, WNOW, makeCtx, setup } from "./osdkTestUtils";
+import { whereFieldsOn } from "../../helpers/recordingClient";
+import { SOME_FILTERS, W7, WNOW, makeCtx, setup } from "../../helpers/osdkHarness";
 
 // Decision D16 (osdk F3): group-by-only properties must never appear in a where clause sent for
 // AlertHistory (persona, riskType, priorityAtEvent) or OtifOrderVerdict (critClassification). Spec §3, §5 B9.

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { carriedPopulation } from "../../compute/deriveItemFunnelAlert";
 import { deriveItemFunnel } from "../../compute/deriveItemFunnel";
 import type { AlertViewRaw } from "../../types";
-import { NOW_ISO, SMALL, daysAgo, ev, fact, openAlert, sel, win } from "./deriveTestUtils";
+import { NOW_ISO, SMALL, daysAgo, ev, fact, openAlert, win } from "../helpers/deriveRows";
+import { sel } from "../helpers/testKit";
 
 // Human rows: a1 viewed + acted + written back; a2 viewed; a3 acted without a view; a4 write-back only (also an
 // action, source "user"); a5 viewed.

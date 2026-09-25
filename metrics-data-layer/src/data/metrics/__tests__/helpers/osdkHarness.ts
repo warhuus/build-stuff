@@ -1,9 +1,9 @@
 /** Shared fixtures of the source/osdk tests: config, windows, contexts and a source over a recording client. */
 import * as sdk from "@app/sdk";
-import { METRICS_CONFIG, type MetricsConfig } from "../../../../../config/metrics";
-import type { ItemFilters, Progress, Window } from "../../../types";
-import type { MetricsSource, SourceCtx } from "../../../source/MetricsSource";
-import { createOsdkSource } from "../../../source/osdk/osdkSource";
+import { METRICS_CONFIG, type MetricsConfig } from "../../../../config/metrics";
+import type { ItemFilters, Progress, Window } from "../../types";
+import type { MetricsSource, SourceCtx } from "../../source/MetricsSource";
+import { createOsdkSource } from "../../source/osdk/osdkSource";
 import { createRecordingClient, type RecordingClient } from "./recordingClient";
 
 /** Config with the integration placeholders filled (tests override config, Appendix A X4). */

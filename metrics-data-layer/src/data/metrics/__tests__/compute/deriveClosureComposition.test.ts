@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { deriveClosureComposition } from "../../compute/deriveClosureComposition";
 import type { ClosureCompositionRaw } from "../../types";
-import { SMALL, daysAgo, fact, sel, win } from "./deriveTestUtils";
+import { SMALL, daysAgo, fact, win } from "../helpers/deriveRows";
+import { sel } from "../helpers/testKit";
 
 const raw: ClosureCompositionRaw = {
   window: win(7),

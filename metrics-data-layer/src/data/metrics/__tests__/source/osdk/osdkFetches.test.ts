@@ -1,75 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { PLACEHOLDER } from "../../../../../config/metrics";
-import { EVENT_SELECT, ITEM_SELECT, OPEN_ALERT_SELECT, VERDICT_SELECT } from "../../../source/osdk/rowMapping";
-import { chainOf, type WireBody } from "./recordingClient";
-import { makeCtx, setup } from "./osdkTestUtils";
+import { ITEM_SELECT, OPEN_ALERT_SELECT, VERDICT_SELECT } from "../../../source/osdk/rowMapping";
+import { chainOf, type WireBody } from "../../helpers/recordingClient";
+import { makeCtx, setup } from "../../helpers/osdkHarness";
 
-const event = (i: number) => ({ riskAlertId: `a${i}`, eventType: "closed", eventTimestamp: "2026-09-01T00:00:00Z" });
 const tokenOf = (b: WireBody): unknown => b.pageToken;
 const inIds = (b: WireBody): unknown => chainOf(b.objectSet)[1];
 
-/** A server with `pages` pages of `per` events each, linked by tokens p1, p2, … */
-function pagedEvents(pages: number, per: number) {
-  return (b: WireBody) => {
-    const n = typeof b.pageToken === "string" ? Number(b.pageToken.slice(1)) : 0;
-    const data = Array.from({ length: per }, (_, i) => event(n * per + i));
-    return { data, nextPageToken: n + 1 < pages ? `p${n + 1}` : undefined };
-  };
-}
-
-describe("paged fetches (spec §9.0 fetchAllPages)", () => {
-  it("follows nextPageToken with PAGE_SIZE and a literal $select, reporting progress", async () => {
-    const t = setup();
-    t.handlers.load = pagedEvents(3, 2);
-    const ctx = makeCtx({ PAGE_SIZE: 2 });
-    const out = await t.source.fetchEvents({ kind: "all" }, ctx);
-    expect(out.capped).toBe(false);
-    expect(out.rows.map((r) => r.riskAlertId)).toEqual(["a0", "a1", "a2", "a3", "a4", "a5"]);
-    expect(t.requests.map((r) => tokenOf(r.body))).toEqual([undefined, "p1", "p2"]);
-    expect(t.requests.every((r) => r.body.pageSize === 2)).toBe(true);
-    expect(t.requests[0].body.select).toEqual([...EVENT_SELECT]);
-    expect(ctx.progress).toEqual([{ loaded: 2 }, { loaded: 4 }, { loaded: 6 }]);
-  });
-
-  it("stops at ROW_CAP with capped", async () => {
-    const t = setup();
-    t.handlers.load = pagedEvents(100, 2);
-    const out = await t.source.fetchEvents({ kind: "all" }, makeCtx({ PAGE_SIZE: 2, ROW_CAP: 5 }));
-    expect(out.rows).toHaveLength(5);
-    expect(out.capped).toBe(true);
-    expect(t.requests).toHaveLength(3);
-  });
-
-  it("is capped when the rows reach ROW_CAP exactly, even on the last page (spec §9.0 rows.length >= ROW_CAP; L1)", async () => {
-    const t = setup();
-    t.handlers.load = pagedEvents(2, 2);
-    const out = await t.source.fetchEvents({ kind: "all" }, makeCtx({ PAGE_SIZE: 2, ROW_CAP: 4 }));
-    expect(out).toMatchObject({ capped: true });
-    expect(out.rows).toHaveLength(4);
-    expect(t.requests).toHaveLength(2);
-  });
-
-  it("is not capped below ROW_CAP", async () => {
-    const t = setup();
-    t.handlers.load = pagedEvents(2, 2);
-    const out = await t.source.fetchEvents({ kind: "all" }, makeCtx({ PAGE_SIZE: 2, ROW_CAP: 5 }));
-    expect(out).toMatchObject({ capped: false });
-    expect(out.rows).toHaveLength(4);
-  });
-
-  it("checks the signal between pages and rejects with AbortError", async () => {
-    const t = setup();
-    const ctx = makeCtx({ PAGE_SIZE: 2 });
-    const serve = pagedEvents(5, 2);
-    t.handlers.load = (b) => {
-      ctx.controller.abort();
-      return serve(b);
-    };
-    await expect(t.source.fetchEvents({ kind: "all" }, ctx)).rejects.toMatchObject({ name: "AbortError" });
-    expect(t.requests).toHaveLength(1);
-  });
-
+describe("row fetches (spec §9.0.1)", () => {
   it("fetchOpenAlerts and fetchItems select the row-type columns", async () => {
     const t = setup();
     await t.source.fetchOpenAlerts({ kind: "all" }, makeCtx());

@@ -1,7 +1,7 @@
 /** Test helper for loadCard / useMetric: a source wrapper that can observe, delay or fail every port call. */
-import { createFakeSource, type FakeSource } from "../source/fake/fakeSource";
-import type { MetricsSource, SourceCtx } from "../source/MetricsSource";
-import type { Deferred } from "./shared/deferred";
+import { createFakeSource, type FakeSource } from "../../source/fake/fakeSource";
+import type { MetricsSource, SourceCtx } from "../../source/MetricsSource";
+import type { Deferred } from "./deferred";
 
 /** Called before every port call; may return a promise the call waits for, or throw/reject to fail it. */
 export type BeforeCall = (method: keyof MetricsSource, args: readonly unknown[], ctx: SourceCtx) => Promise<void> | void;

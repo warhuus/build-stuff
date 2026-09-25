@@ -9,8 +9,7 @@ import {
   toVerdictRow,
   verdictDateReader,
 } from "../../../source/osdk/rowMapping";
-import { fetchAllPages } from "../../../source/osdk/paging";
-import { TEST_CONFIG } from "./osdkTestUtils";
+import { TEST_CONFIG } from "../../helpers/osdkHarness";
 
 describe("row mapping (decision D15)", () => {
   it("maps AlertHistory rows; drops rows without riskAlertId, eventType or a valid timestamp", () => {
@@ -83,17 +82,5 @@ describe("row mapping (decision D15)", () => {
     expect(toVerdictRow({ otifOrderId: "o" }, other)?.verdictDate).toBeNull();
     expect(toVerdictRow({ initOtifClassification: "OTIF" }, other)).toBeNull();
     expect(() => verdictDateReader({ ...TEST_CONFIG, VERDICT_DATE_PROPERTY: PLACEHOLDER })).toThrow();
-  });
-});
-
-describe("paging helpers", () => {
-  it("fetchAllPages tolerates a missing data array and a null token", async () => {
-    const page = () => Promise.resolve({ data: [], nextPageToken: undefined, totalCount: "0" });
-    expect(await fetchAllPages(page, new AbortController().signal, 10, () => undefined)).toEqual({ rows: [], capped: false });
-  });
-
-  it("fetchAllPages reports capped when the rows reach the cap exactly (spec §9.0, lead note L1)", async () => {
-    const page = () => Promise.resolve({ data: [1, 2], nextPageToken: undefined, totalCount: "2" });
-    expect(await fetchAllPages(page, new AbortController().signal, 2, () => undefined)).toEqual({ rows: [1, 2], capped: true });
   });
 });

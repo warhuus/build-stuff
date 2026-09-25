@@ -11,7 +11,7 @@ import {
   openAlertDimValue,
   openAlertKeyOf,
 } from "../../compute/dimValues";
-import { fact, item, openAlert } from "./deriveTestUtils";
+import { fact, item, openAlert } from "../helpers/deriveRows";
 
 describe("dimValues", () => {
   it("reads item dims", () => {

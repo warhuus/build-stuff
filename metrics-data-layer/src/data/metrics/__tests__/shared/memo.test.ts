@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearMetricsCache } from "../../shared/cache";
 import { createSharedMemo, memoKey } from "../../shared/memo";
 import { EMPTY_FILTERS } from "../../selection";
-import { deferred, flush } from "./deferred";
+import { deferred, flush } from "../helpers/deferred";
 
 describe("createSharedMemo (D7)", () => {
   beforeEach(() => clearMetricsCache());

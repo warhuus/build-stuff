@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { deriveOtifOutcome } from "../../compute/deriveOtifOutcome";
 import { EMPTY_FILTERS } from "../../selection";
 import type { OtifOutcomeRaw, VerdictRow } from "../../types";
-import { sel, win } from "./deriveTestUtils";
+import { win } from "../helpers/deriveRows";
+import { sel } from "../helpers/testKit";
 
 const v = (id: string, overrides: Partial<VerdictRow> = {}): VerdictRow => ({
   otifOrderId: id,

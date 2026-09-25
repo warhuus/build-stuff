@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { deriveAgeingBacklog } from "../../compute/deriveAgeingBacklog";
 import type { AgeingBacklogRaw, BreakdownDimension } from "../../types";
-import { NOW_ISO, SMALL, daysAgo, ev, item, openAlert, sel, win } from "./deriveTestUtils";
+import { NOW_ISO, SMALL, daysAgo, ev, item, openAlert, win } from "../helpers/deriveRows";
+import { sel } from "../helpers/testKit";
 
 const base: AgeingBacklogRaw = {
   window: win(30),

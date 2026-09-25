@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { METRICS_CONFIG } from "../../../../config/metrics";
 import { inVerdictWindow, outcomeHeadline, passesGate, verdictOf } from "../../compute/otifOutcome";
 import type { VerdictRow } from "../../types";
-import { win } from "./deriveTestUtils";
+import { win } from "../helpers/deriveRows";
 
 const v = (id: string, overrides: Partial<VerdictRow> = {}): VerdictRow => ({
   otifOrderId: id,

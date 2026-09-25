@@ -3,15 +3,15 @@ import { deriveItemFunnel } from "../../compute/deriveItemFunnel";
 import { loadItemFunnel } from "../../loaders/itemFunnel";
 import { carriedAlertSets } from "../../query/buildFunnel";
 import { humanEvents } from "../../query/build";
-import { DEFAULT_SELECTION, EMPTY_FILTERS } from "../../selection";
+import { EMPTY_FILTERS } from "../../selection";
 import { clearMetricsCache } from "../../shared/cache";
-import type { AlertViewRaw, BreakdownDimension, ItemFilters, Selection, WindowKey } from "../../types";
-import { AMER, fakeDeps, idsOf, win } from "../shared/loaderDeps";
+import type { AlertViewRaw, BreakdownDimension, WindowKey } from "../../types";
+import { AMER, fakeDeps, idsOf, win } from "../helpers/loaderDeps";
+import { sel } from "../helpers/testKit";
 
-const sel = (window: WindowKey, filters: ItemFilters = EMPTY_FILTERS): Selection => ({ ...DEFAULT_SELECTION, window, view: "alert", filters });
 type Deps = ReturnType<typeof fakeDeps>;
 async function run(window: WindowKey, dim: BreakdownDimension | null, filters = EMPTY_FILTERS, deps: Deps = fakeDeps()) {
-  const out = await loadItemFunnel(sel(window, filters), dim, deps);
+  const out = await loadItemFunnel(sel({ view: "alert", window: window, filters: filters }), dim, deps);
   if (out.raw.view !== "alert") throw new Error("expected alert view");
   const raw: AlertViewRaw = out.raw;
   return { out, raw, deps };
@@ -139,12 +139,12 @@ describe("loadItemFunnel alert view (spec §9 2.1–2.4 alert view, D12)", () =>
     const { out } = await run(7, "alertType", EMPTY_FILTERS, deps);
     expect(out.status).toBe("partial");
     expect(out.caveats).toEqual(["row-cap"]); // the loader never adds truncated (MOD-02)
-    expect(deriveItemFunnel(out.raw, sel(7), deps.config).caveats).toContain("truncated");
+    expect(deriveItemFunnel(out.raw, sel({ view: "alert", window: 7 }), deps.config).caveats).toContain("truncated");
   });
 
   it("end to end with deriveItemFunnel: 2.1 = a + open − open-with-lifecycle; 2.2–2.4 nested in 2.1 (COR-01)", async () => {
     const { out } = await run(7, null);
-    const stages = deriveItemFunnel(out.raw, sel(7)).data.total.stages;
+    const stages = deriveItemFunnel(out.raw, sel({ view: "alert", window: 7 })).data.total.stages;
     // 2.1 = 27 + 48 − 18 = 57.
     // Hand derivation (fixtureAlerts.ts, 7 d start @7:12): L1 alerts A09 A11 A13 A15 A18 A19 A21 A25 A32 A44 A46
     // A49 A53 A54 A58 A62 A65 A70 (18). 2.1 population among them = open now (A09 A11 A13 A15 A18 A19 A21 A25
@@ -159,7 +159,7 @@ describe("loadItemFunnel alert view (spec §9 2.1–2.4 alert view, D12)", () =>
   });
 
   it("end to end alertType / routingPersona at 7 d: groups within 2.1, open alerts by AOF (COR-01, COR-02)", async () => {
-    const at = deriveItemFunnel((await run(7, "alertType")).out.raw, sel(7)).data.breakdown;
+    const at = deriveItemFunnel((await run(7, "alertType")).out.raw, sel({ view: "alert", window: 7 })).data.breakdown;
     // viewed population alerts by type: LateGI A09 A13 A15 A19 A25 A46 A49 A65 = 8 (9 before: A53);
     // CreditBlock A58 A62 = 2; Allocation A11 A44 = 2. 2.3: LateGI A15 A19 A25 A46 A49 = 5; 2.4 LateGI A25.
     expect(at?.groups.map((g) => [g.group, g.data.stages.map((s) => s.count)])).toEqual([
@@ -169,7 +169,7 @@ describe("loadItemFunnel alert view (spec §9 2.1–2.4 alert view, D12)", () =>
     ]);
     expect(at?.other?.stages.map((s) => s.count)).toEqual([null, 0, 0, 0, 0]);
     clearMetricsCache();
-    const rp = deriveItemFunnel((await run(7, "routingPersona")).out.raw, sel(7)).data.breakdown;
+    const rp = deriveItemFunnel((await run(7, "routingPersona")).out.raw, sel({ view: "alert", window: 7 })).data.breakdown;
     // Planner A09 A15 A25 = 3 (4 before: A53); Logistics A13 A19 A46 A49 A58 = 5; CustomerService A11 A44 A62
     // A65 = 4. 2.3: Planner A15 A25, Logistics A19 A46 A49, CustomerService none.
     expect(rp?.groups.map((g) => [g.group, g.data.stages.slice(2).map((s) => s.count)])).toEqual([
@@ -180,7 +180,7 @@ describe("loadItemFunnel alert view (spec §9 2.1–2.4 alert view, D12)", () =>
   });
 
   it("end to end routingPersona under now: open alerts with no pipeline event keep their AOF group (COR-02)", async () => {
-    const bd = deriveItemFunnel((await run("now", "routingPersona")).out.raw, sel("now")).data.breakdown;
+    const bd = deriveItemFunnel((await run("now", "routingPersona")).out.raw, sel({ view: "alert", window: "now" })).data.breakdown;
     // Before COR-02, other had 2.2 = 2 (A32 viewed @120, A33 viewed @200: no op token, so no L2 attrs). Now
     // every open alert takes its AOF persona (A32 Planner, A33 Logistics): other is 0 on every stage.
     expect(bd?.other?.stages.map((s) => s.count)).toEqual([null, 0, 0, 0, 0]);

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { deriveItemFunnel } from "../../compute/deriveItemFunnel";
 import type { ItemViewRaw } from "../../types";
-import { NOW_ISO, SMALL, sel, win } from "./deriveTestUtils";
+import { NOW_ISO, SMALL, win } from "../helpers/deriveRows";
+import { sel } from "../helpers/testKit";
 
 const cv = (count: number, valueUsd: number) => ({ count, valueUsd });
 const raw: ItemViewRaw = {

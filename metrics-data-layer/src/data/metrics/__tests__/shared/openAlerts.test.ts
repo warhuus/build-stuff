@@ -3,7 +3,7 @@ import { l3Items, l3OpenAlerts, l3OpenedEvents } from "../../query/build";
 import { clearMetricsCache } from "../../shared/cache";
 import { loadOpenAlertItems, loadOpenAlertOpenedEvents, loadOpenAlerts } from "../../shared/openAlerts";
 import { EMPTY_FILTERS } from "../../selection";
-import { AMER, callCount, fakeDeps, idsOf } from "./loaderDeps";
+import { AMER, callCount, fakeDeps, idsOf } from "../helpers/loaderDeps";
 
 describe("L3 open alerts (spec §9.0.1 L3)", () => {
   beforeEach(() => clearMetricsCache());

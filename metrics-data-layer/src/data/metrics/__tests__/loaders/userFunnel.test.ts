@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { deriveUserFunnel } from "../../compute/deriveUserFunnel";
 import { escalatedEvents, events } from "../../query/build";
-import { DEFAULT_SELECTION, EMPTY_FILTERS } from "../../selection";
+import { EMPTY_FILTERS } from "../../selection";
 import { clearMetricsCache } from "../../shared/cache";
 import { loadUserFunnel } from "../../loaders/userFunnel";
-import type { BreakdownDimension, ItemFilters, Selection, WindowKey } from "../../types";
-import { AMER, fakeDeps, win } from "../shared/loaderDeps";
+import type { BreakdownDimension, ItemFilters, WindowKey } from "../../types";
+import { AMER, fakeDeps, win } from "../helpers/loaderDeps";
+import { sel } from "../helpers/testKit";
 
-const sel = (window: WindowKey, filters: ItemFilters = EMPTY_FILTERS): Selection => ({ ...DEFAULT_SELECTION, window, filters });
 const run = (window: WindowKey, dim: BreakdownDimension | null, filters: ItemFilters = EMPTY_FILTERS) => {
   const deps = fakeDeps();
-  return loadUserFunnel(sel(window, filters), dim, deps).then((out) => ({ out, deps }));
+  return loadUserFunnel(sel({ window: window, filters: filters }), dim, deps).then((out) => ({ out, deps }));
 };
 
 // Fixture users (fixtures.ts APP_USAGE_ROWS, fixtureAlerts.ts): app usage u1 d0/d1 Planner + d3 Logistics, u2 d2/d20
@@ -141,17 +141,17 @@ describe("loadUserFunnel (spec §9 1.1–1.4)", () => {
     const capped = fakeDeps({ config: { MAX_GROUPS: 3 } });
     // 1.2/1.3 queueFilter 7 d have 4 groups → cut to 3 = MAX_GROUPS.
     // The loader adds no caveat (MOD-02); derive decides from the grouped lists in the raw.
-    const out = await loadUserFunnel(sel(7), "queueFilter", capped);
+    const out = await loadUserFunnel(sel({ window: 7 }), "queueFilter", capped);
     expect(out).toMatchObject({ status: "ok", caveats: [] });
-    expect(deriveUserFunnel(out.raw, sel(7), capped.config).caveats).toContain("truncated");
+    expect(deriveUserFunnel(out.raw, sel({ window: 7 }), capped.config).caveats).toContain("truncated");
     const two = fakeDeps({ config: { MAX_GROUPS: 2 } });
-    const pairs = await loadUserFunnel(sel(7), "escalated", two);
-    expect(deriveUserFunnel(pairs.raw, sel(7), two.config).caveats).not.toContain("truncated"); // SPF-06
+    const pairs = await loadUserFunnel(sel({ window: 7 }), "escalated", two);
+    expect(deriveUserFunnel(pairs.raw, sel({ window: 7 }), two.config).caveats).not.toContain("truncated"); // SPF-06
   });
 
   it("end to end with deriveUserFunnel: 1.1–1.4 counts", async () => {
     const { out } = await run(7, null);
-    const series = deriveUserFunnel(out.raw, sel(7)).data.total;
+    const series = deriveUserFunnel(out.raw, sel({ window: 7 })).data.total;
     expect(series.stages.map((s) => s.count)).toEqual([null, 3, 5, 5, 1]);
   });
 });

@@ -5,8 +5,8 @@ import { loadNotWorkedAlerts } from "../../shared/notWorkedAlerts";
 import { loadOpenAlerts } from "../../shared/openAlerts";
 import { loadTouchedAlerts } from "../../shared/touchedAlerts";
 import { EMPTY_FILTERS } from "../../selection";
-import { flush } from "./deferred";
-import { callCount, fakeDeps, win } from "./loaderDeps";
+import { flush } from "../helpers/deferred";
+import { callCount, fakeDeps, win } from "../helpers/loaderDeps";
 
 // Memo behaviour shared by every shared loader (lead decision D7, spec §11 "Shared loaders").
 describe("shared loader memos", () => {

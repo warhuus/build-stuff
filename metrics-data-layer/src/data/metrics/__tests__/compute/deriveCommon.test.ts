@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { METRICS_CONFIG } from "../../../../config/metrics";
 import { additiveRowBreakdown, caveatsIf, caveatsIfNow, truncationCaveats } from "../../compute/deriveCommon";
 import type { BreakdownResult } from "../../types";
-import { SMALL } from "./deriveTestUtils";
+import { SMALL } from "../helpers/deriveRows";
 
 const bd = (truncated: BreakdownResult<number>["truncated"]): BreakdownResult<number> => ({
   dimension: "plant",

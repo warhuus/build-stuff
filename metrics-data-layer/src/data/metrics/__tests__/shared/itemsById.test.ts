@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadItemsByIds } from "../../shared/itemsById";
-import { fakeDeps } from "./loaderDeps";
+import { fakeDeps } from "../helpers/loaderDeps";
 
 describe("loadItemsByIds (spec §9.0 itemsById)", () => {
   it("de-duplicates and sorts the ids; missing ids are absent", async () => {

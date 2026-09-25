@@ -3,7 +3,7 @@ import { callCtx, sourceCtxOf, withCallProgress } from "../../shared/sourceCtx";
 import { createFakeSource } from "../../source/fake/fakeSource";
 import { FIXTURE_CONFIG, FIXTURE_NOW } from "../../source/fake/fixtures";
 import type { SourceCtx } from "../../source/MetricsSource";
-import { wrapSource } from "../loadCardTestUtils";
+import { wrapSource } from "../helpers/wrapSource";
 
 const baseCtx = (): SourceCtx => ({ signal: new AbortController().signal, config: FIXTURE_CONFIG });
 

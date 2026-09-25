@@ -2,8 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { PLACEHOLDER } from "../../../../../config/metrics";
 import type { EventGroupField, OpenAlertGroupField } from "../../../query/specs";
-import { chainOf, isGrouped, type AggregateReply } from "./recordingClient";
-import { TEST_CONFIG, W7, WNOW, makeCtx, setup } from "./osdkTestUtils";
+import { chainOf, isGrouped, type AggregateReply } from "../../helpers/recordingClient";
+import { TEST_CONFIG, W7, WNOW, makeCtx, setup } from "../../helpers/osdkHarness";
 
 const exact = (field: string, max = TEST_CONFIG.MAX_GROUPS) => [{ type: "exact", field, maxGroupCount: max }];
 const reply = (rows: [Record<string, unknown>, Record<string, number>][]): AggregateReply => ({

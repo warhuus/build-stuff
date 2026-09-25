@@ -13,7 +13,7 @@ import {
   verdictGate,
 } from "../../../source/osdk/compileWhere";
 import { PLACEHOLDER, type MetricsConfig } from "../../../../../config/metrics";
-import { NO_FILTERS, SOME_FILTERS, TEST_CONFIG, W7, WNOW } from "./osdkTestUtils";
+import { NO_FILTERS, SOME_FILTERS, TEST_CONFIG, W7, WNOW } from "../../helpers/osdkHarness";
 
 const PRED = buildPredicates(TEST_CONFIG);
 const VIEWED = { eventType: { $eq: "opened_by_user" } };

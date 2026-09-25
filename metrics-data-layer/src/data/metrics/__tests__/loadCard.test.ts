@@ -2,30 +2,17 @@ import { beforeEach, describe, expect, expectTypeOf, it } from "vitest";
 import { METRICS_CONFIG } from "../../../config/metrics";
 import { loadCard, peekCard, precheckCard } from "../loadCard";
 import { humanEvents, touchedEventsChain } from "../query/build";
-import { DEFAULT_SELECTION, EMPTY_FILTERS } from "../selection";
+import { EMPTY_FILTERS } from "../selection";
 import { clearMetricsCache } from "../shared/cache";
 import { createFakeSource } from "../source/fake/fakeSource";
 import { FIXTURE_CONFIG, FIXTURE_NOW } from "../source/fake/fixtures";
-import type {
-  AgeingBacklog,
-  BucketRow,
-  CalibrationRow,
-  CardData,
-  CompositionResult,
-  DurationResult,
-  FunnelSeries,
-  MetricResult,
-  MovementRow,
-  OutcomeHeadline,
-  RolledMonthRow,
-  Selection,
-} from "../types";
+import type { AgeingBacklog, BucketRow, CalibrationRow, CardData, CompositionResult, DurationResult, FunnelSeries, MetricResult, MovementRow, OutcomeHeadline, RolledMonthRow } from "../types";
 import { resolveWindow } from "../window";
 import type { MetricsSource } from "../source/MetricsSource";
-import { AMER } from "./shared/loaderDeps";
+import { AMER } from "./helpers/loaderDeps";
+import { sel } from "./helpers/testKit";
 
 const opts = (source: MetricsSource = createFakeSource()) => ({ source, now: FIXTURE_NOW, config: FIXTURE_CONFIG });
-const sel = (over: Partial<Selection> = {}): Selection => ({ ...DEFAULT_SELECTION, ...over });
 
 beforeEach(() => {
   clearMetricsCache();

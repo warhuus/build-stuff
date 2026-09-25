@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { startInFlight } from "../../shared/inflight";
-import { deferred } from "./deferred";
+import { deferred } from "../helpers/deferred";
 
 describe("startInFlight", () => {
   it("an already aborted joiner is rejected and, alone, abandons the run", async () => {

@@ -5,30 +5,16 @@ import { METRICS_CONFIG, type MetricsConfig } from "../../../../config/metrics";
 import { MetricsSourceProvider } from "../../hooks/MetricsSourceContext";
 import { useMetric } from "../../hooks/useMetric";
 import { loadCard } from "../../loadCard";
-import { DEFAULT_SELECTION } from "../../selection";
 import { clearMetricsCache } from "../../shared/cache";
 import { createFakeSource } from "../../source/fake/fakeSource";
 import { FIXTURE_CONFIG, FIXTURE_NOW } from "../../source/fake/fixtures";
 import type { MetricsSource } from "../../source/MetricsSource";
-import type {
-  AgeingBacklog,
-  BucketRow,
-  CalibrationRow,
-  CardData,
-  CompositionResult,
-  DurationResult,
-  FunnelSeries,
-  MetricResult,
-  MovementRow,
-  OutcomeHeadline,
-  RolledMonthRow,
-  Selection,
-} from "../../types";
-import { gatedUserSource, wrapSource } from "../loadCardTestUtils";
-import { deferred, flush } from "../shared/deferred";
+import type { AgeingBacklog, BucketRow, CalibrationRow, CardData, CompositionResult, DurationResult, FunnelSeries, MetricResult, MovementRow, OutcomeHeadline, RolledMonthRow } from "../../types";
+import { gatedUserSource, wrapSource } from "../helpers/wrapSource";
+import { deferred, flush } from "../helpers/deferred";
+import { sel } from "../helpers/testKit";
 
 const clock = (): Date => FIXTURE_NOW;
-const sel = (over: Partial<Selection> = {}): Selection => ({ ...DEFAULT_SELECTION, ...over });
 
 function wrapperFor(source: MetricsSource, config: MetricsConfig = FIXTURE_CONFIG) {
   return ({ children }: { children: ReactNode }) =>

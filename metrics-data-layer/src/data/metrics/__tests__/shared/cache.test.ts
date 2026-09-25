@@ -10,7 +10,7 @@ import {
 } from "../../shared/cache";
 import type { LoaderOutput, OtifOutcomeRaw } from "../../types";
 import { resolveWindow } from "../../window";
-import { deferred, flush } from "./deferred";
+import { deferred, flush } from "../helpers/deferred";
 
 const NOW = new Date("2026-09-24T12:00:00.000Z");
 const RAW: OtifOutcomeRaw = {
