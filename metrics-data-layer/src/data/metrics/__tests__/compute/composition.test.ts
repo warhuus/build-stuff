@@ -1,63 +1,59 @@
+// Closure composition (4.6): four groups, noHuman by subtraction, one breakdown.
 import { describe, expect, it } from "vitest";
-import { compositionBreakdown, compositionOf } from "../../compute/composition";
-import { SMALL, fact } from "../helpers/deriveRows";
+import { compositionOf } from "../../compute/composition";
+import { deriveClosureComposition } from "../../compute/deriveClosureComposition";
+import type { ClosureCompositionRaw } from "../../types";
+import { daysAgo, fact, win } from "../helpers/deriveRows";
+import { sel } from "../helpers/testKit";
 
-const attrs = (alertType: string | null) => ({ alertType, routingPersona: "P", priority: "H" });
+const B = { alertType: "B", routingPersona: "P2", priority: "Low" };
 
 describe("compositionOf", () => {
-  it("zero-fills 4 rows in CLOSURE_GROUPS order; noHuman = closedTotal − touched groups", () => {
-    const touched = [
-      fact("w", { closureGroup: "writeBack" }),
-      fact("a", { closureGroup: "action" }),
-      fact("v", { closureGroup: "viewOnly" }),
-      fact("n", { closureGroup: "noHuman" }), // human events only after closure → in the remainder
-    ];
-    const out = compositionOf(10, touched);
+  it.each([
+    // touched: one per group; the noHuman one (human events only after closure) stays in the remainder
+    ["noHuman = closedTotal − touched groups", 10, ["writeBack", "action", "viewOnly", "noHuman"], [7, 1, 1, 1]],
+    ["noHuman clamped at 0 (W7)", 1, ["action", "action"], [0, 0, 2, 0]],
+  ] as const)("%s", (_, closedTotal, groups, counts) => {
+    const out = compositionOf(closedTotal, groups.map((g, i) => fact(`a${i}`, { closureGroup: g })));
     expect(out.rows).toEqual([
-      { group: "noHuman", count: 7 },
-      { group: "viewOnly", count: 1 },
-      { group: "action", count: 1 },
-      { group: "writeBack", count: 1 },
+      { group: "noHuman", count: counts[0] },
+      { group: "viewOnly", count: counts[1] },
+      { group: "action", count: counts[2] },
+      { group: "writeBack", count: counts[3] },
     ]);
-    expect(out.closedTotal).toBe(10);
-  });
-
-  it("clamps noHuman at 0 (W7)", () => {
-    expect(compositionOf(1, [fact("a", { closureGroup: "action" }), fact("b", { closureGroup: "action" })]).rows[0]).toEqual({
-      group: "noHuman",
-      count: 0,
-    });
   });
 });
 
-describe("compositionBreakdown", () => {
-  it("top-N by closedTotal(g); other = closedTotal − Σ shown with touched outside", () => {
-    const byGroup = [
-      { group: "A", count: 5 },
-      { group: "B", count: 3 },
-      { group: "C", count: 1 },
-    ];
-    const touched = [
-      fact("a1", { attrs: attrs("A"), closureGroup: "action" }),
-      fact("b1", { attrs: attrs("B"), closureGroup: "writeBack" }),
-      fact("c1", { attrs: attrs("C"), closureGroup: "viewOnly" }),
-      fact("x1", { attrs: attrs(null), closureGroup: "viewOnly" }),
-    ];
-    const bd = compositionBreakdown("alertType", 10, byGroup, touched, SMALL);
-    expect(bd.groups.map((g) => [g.group, g.data.closedTotal, g.data.rows.map((r) => r.count)])).toEqual([
-      ["A", 5, [4, 0, 1, 0]],
-      ["B", 3, [2, 0, 0, 1]],
+describe("deriveClosureComposition (4.6)", () => {
+  const raw: ClosureCompositionRaw = {
+    window: win(7),
+    dimension: null,
+    closedTotal: 6,
+    closedTotalByGroup: null,
+    facts: [
+      fact("a1", { closureGroup: "action" }),
+      fact("w1", { closureGroup: "writeBack", attrs: B }),
+      fact("old", { closureGroup: "viewOnly", closedAt: daysAgo(30) }), // closed before the window
+      fact("open", { isClosed: false, closureGroup: null }),
+    ],
+  };
+
+  it("only touched alerts closed in the window; groups sum to closedTotal", () => {
+    const rows = deriveClosureComposition(raw, sel()).data.total.rows;
+    expect(rows.map((r) => [r.group, r.count])).toEqual([["noHuman", 4], ["viewOnly", 0], ["action", 1], ["writeBack", 1]]);
+    expect(rows.reduce((sum, r) => sum + r.count, 0)).toBe(6);
+  });
+
+  it("breakdown by alertType: groups from closedTotalByGroup, other = closedTotal − Σ shown", () => {
+    const out = deriveClosureComposition(
+      { ...raw, window: win("now"), dimension: "alertType", closedTotalByGroup: [{ group: "A", count: 4 }, { group: "B", count: 1 }] },
+      sel({ window: "now" }),
+    );
+    // under now "old" is in too: A = a1 action + old viewOnly → noHuman 4 − 2 = 2; B = w1 writeBack
+    expect(out.data.breakdown?.groups.map((g) => [g.group, g.data.rows.map((r) => r.count)])).toEqual([
+      ["A", [2, 1, 1, 0]],
+      ["B", [0, 0, 0, 1]],
     ]);
-    // other: closedTotal 10 − 8 = 2; touched outside: c1, x1 (viewOnly) → noHuman 0
-    expect(bd.other).toEqual({
-      closedTotal: 2,
-      rows: [
-        { group: "noHuman", count: 0 },
-        { group: "viewOnly", count: 2 },
-        { group: "action", count: 0 },
-        { group: "writeBack", count: 0 },
-      ],
-    });
-    expect(bd.truncated).toEqual({ shown: 2, total: 3 });
+    expect(out.data.breakdown?.other?.closedTotal).toBe(1); // 6 − (4 + 1)
   });
 });

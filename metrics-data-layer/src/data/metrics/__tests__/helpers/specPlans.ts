@@ -1,28 +1,26 @@
 /**
  * Test helper: the spec §9 plans written out as expected OSDK call chains (`chainOf` steps), from the spec's
- * pseudocode literals, NOT from production code. Used by the plan-chain tests (TST-02 / OSD-03).
+ * pseudocode literals, NOT from production code. Used by source/osdk/queries.test.ts.
  */
 import type { Window } from "../../types";
 import type { Step } from "./recordingClient";
 
 // Spec §9.0 named predicates, verbatim.
 /** `PRED.viewed`. */
-export const VIEWED = { eventType: { $eq: "opened_by_user" } };
+const VIEWED = { eventType: { $eq: "opened_by_user" } };
 /** `PRED.action`. */
-export const ACTION = {
+const ACTION = {
   $and: [
     { $or: [{ eventSource: { $in: ["user", "user action", "action"] } }, { eventType: { $eq: "deeplink_clicked" } }] },
     { $not: { eventType: { $eq: "updated" } } },
   ],
 };
 /** `PRED.writeback`. */
-export const WRITEBACK = {
+const WRITEBACK = {
   eventType: { $in: ["delivery_block_removed", "delivery_tolerance_corrected", "allocation_rejection_lifted"] },
 };
 /** `PRED.human`. */
 export const HUMAN = { $or: [VIEWED, ACTION, WRITEBACK] };
-/** `PRED.opened`. */
-export const OPENED = { eventType: { $eq: "opened" } };
 /** `PRED.closed`. */
 export const CLOSED = { eventType: { $eq: "closed" } };
 /** `PRED.lifecycle`. */
@@ -50,10 +48,10 @@ export const intersect = (a: Step[], b: Step[]): Step[] => [{ intersect: [a, b] 
 /** `a.union(b)`. */
 export const union = (a: Step[], b: Step[]): Step[] => [{ union: [a, b] }];
 /** `a.subtract(b)`. */
-export const subtract = (a: Step[], b: Step[]): Step[] => [{ subtract: [a, b] }];
+const subtract = (a: Step[], b: Step[]): Step[] => [{ subtract: [a, b] }];
 
 /** `withItemFilters(client(SalesOrders), f)`: filtered = SOME_FILTERS, else no where. */
-export const filteredItems = (filtered: boolean): Step[] =>
+const filteredItems = (filtered: boolean): Step[] =>
   filtered ? [base("SalesOrders"), where(SOME_FILTERS_WHERE)] : [base("SalesOrders")];
 
 /** Spec §9.0 `events(pred, w, f)`: AlertHistory directly, or pivoted from the filtered items. */
@@ -62,9 +60,6 @@ export const events = (pred: unknown, w: Window, filtered: boolean): Step[] =>
     ? [...filteredItems(true), pivot("alertHistory"), where({ $and: [pred, tsIn(w)] })]
     : [base("AlertHistory"), where({ $and: [pred, tsIn(w)] })];
 
-/** Spec §9.0 `aofSet(f)`. */
-export const aofSet = (filtered: boolean): Step[] =>
-  filtered ? [...filteredItems(true), pivot("orderFulfillmentAlerts")] : [base("AlertOrderFulfillment")];
 
 /** Spec §9 4.2 / 4.6 `finalSet` = closedSet.subtract(closedSet.pivotTo("alert").pivotTo("historyEvents")). */
 export const finalSet = (w: Window, filtered: boolean): Step[] => {

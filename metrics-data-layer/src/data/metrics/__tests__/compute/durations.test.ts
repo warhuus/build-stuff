@@ -1,140 +1,103 @@
+// Duration cards (4.2–4.4): bins, O7 median / p90, negative clamp, populations and exclusions.
 import { describe, expect, it } from "vitest";
-import { METRICS_CONFIG } from "../../../../config/metrics";
-import {
-  closedInWindow,
-  durationResult,
-  durationSeries,
-  firstViewToClosureHours,
-  firstViewToClosurePopulation,
-  notWorkedClosed,
-  raisedToClosedHours,
-  raisedToClosedPopulation,
-  raisedToFirstViewHours,
-  raisedToFirstViewPopulation,
-} from "../../compute/durations";
-import type { DurationPlan } from "../../compute/durations";
+import { DURATION_EDGES_HOURS, METRICS_CONFIG } from "../../../../config/metrics";
+import { assignBin, quantileFromBins } from "../../compute/bins";
+import { deriveFirstViewToClosure, deriveRaisedToClosed, deriveRaisedToFirstView } from "../../compute/deriveDurations";
+import { durationSeries } from "../../compute/durations";
+import type { DurationRaw, WindowKey } from "../../types";
 import { daysAgo, fact, win } from "../helpers/deriveRows";
+import { sel } from "../helpers/testKit";
 
-const binCount = (bins: readonly { binStart: number; count: number }[], start: number): number =>
-  bins.find((b) => b.binStart === start)?.count ?? -1;
+const raw = (overrides: Partial<DurationRaw> = {}, key: WindowKey = 7): DurationRaw => ({
+  window: win(key),
+  dimension: null,
+  facts: [],
+  notWorked: null,
+  items: null,
+  ...overrides,
+});
+
+describe("bins (spec §13 Bins)", () => {
+  it.each([
+    [1, 1], // a value on an edge belongs to the bin starting there: 1 h ∈ [1, 2)
+    [0.999, 0],
+    [2160, 11], // open-ended last bin [2160, ∞)
+  ])("%s h → bin %s", (hours, bin) => {
+    expect(assignBin(hours, DURATION_EDGES_HOURS)).toBe(bin);
+  });
+});
+
+describe("quantileFromBins (Appendix A O7)", () => {
+  const bins = [
+    { binStart: 0, binEnd: 1, count: 2 },
+    { binStart: 1, binEnd: 2, count: 0 },
+    { binStart: 2, binEnd: 4, count: 6 },
+    { binStart: 4, binEnd: null, count: 2 },
+  ];
+  it.each([
+    // n = 10, target 5: c_before 2, [2,4) holds it → 2 + (5 − 2) / 6 · 2 = 3
+    ["median interpolates in its bin", bins, 0.5, 3],
+    ["p90 in the open-ended bin → null", bins, 0.9, null],
+    ["n = 0 → null", [{ binStart: 0, binEnd: 1, count: 0 }], 0.5, null],
+  ])("%s", (_, input, q, expected) => {
+    expect(quantileFromBins(input, q)).toBe(expected);
+  });
+});
 
 describe("durationSeries", () => {
-  it("clamps negatives, bins, n, median and p90 (Appendix A O7)", () => {
+  it("clamps negatives to 0 and counts them; median and p90", () => {
     const { series, clampedNegative } = durationSeries("worked", [-1, 0.5, 1, 3, 3000], METRICS_CONFIG);
     expect(clampedNegative).toBe(1);
     expect(series.n).toBe(5);
-    expect(series.label).toBe("Worked");
-    expect(series.bins).toHaveLength(12);
-    // [0,1): -1→0 and 0.5; [1,2): 1 (edge value belongs to the bin starting there); [2,4): 3; [2160,∞): 3000
-    expect(binCount(series.bins, 0)).toBe(2);
-    expect(binCount(series.bins, 1)).toBe(1);
-    expect(binCount(series.bins, 2)).toBe(1);
-    expect(binCount(series.bins, 2160)).toBe(1);
-    expect(series.bins[11].binEnd).toBeNull();
-    // median target 2.5: bin [1,2) with c_before 2 → 1 + 0.5/1·1 = 1.5
-    expect(series.median).toBe(1.5);
-    // p90 target 4.5: open-ended last bin → null
-    expect(series.p90).toBeNull();
-  });
-
-  it("gives nulls for an empty series", () => {
-    const { series, clampedNegative } = durationSeries("all", [], METRICS_CONFIG);
-    expect(series).toMatchObject({ key: "all", label: "All", n: 0, median: null, p90: null });
-    expect(clampedNegative).toBe(0);
+    // [0,1): −1→0 and 0.5; [1,2): 1; [2,4): 3; [2160,∞): 3000
+    expect(series.bins.filter((b) => b.count > 0).map((b) => [b.binStart, b.count])).toEqual([[0, 2], [1, 1], [2, 1], [2160, 1]]);
+    // median target 2.5: [1,2) with c_before 2 → 1 + 0.5/1 · 1 = 1.5; p90 target 4.5 in the open-ended bin → null
+    expect(series).toMatchObject({ median: 1.5, p90: null });
   });
 });
 
-describe("measures", () => {
-  it("4.2 raised → closed", () => {
-    expect(raisedToClosedHours(fact("a", { raisedAt: daysAgo(2), closedAt: daysAgo(1) }))).toBeCloseTo(24);
-    expect(raisedToClosedHours(fact("a", { raisedAt: null }))).toBe("noRaise");
-  });
+describe("deriveRaisedToClosed (4.2)", () => {
+  const facts = [
+    fact("w1", { raisedAt: daysAgo(2), closedAt: daysAgo(1) }), // 24 h
+    fact("w2", { raisedAt: null }), // noRaise
+    fact("w3", { closedAt: daysAgo(20) }), // closed outside the 7-day window
+  ];
+  // n1 not worked (48 h); the not-worked copy of w1 is touched (in the facts) → excluded
+  const notWorked = [fact("n1", { worked: false, raisedAt: daysAgo(3), closedAt: daysAgo(1) }), fact("w1", { worked: false })];
 
-  it("4.3 raised → first view", () => {
-    expect(raisedToFirstViewHours(fact("a", { raisedAt: daysAgo(1), firstViewAt: daysAgo(0.5) }))).toBeCloseTo(12);
-    expect(raisedToFirstViewHours(fact("a", { raisedAt: null, firstViewAt: daysAgo(0.5) }))).toBe("noRaise");
-  });
-
-  it("4.4 first view → closure: close before view excluded, tie kept, unparsable excluded", () => {
-    expect(firstViewToClosureHours(fact("a", { firstViewAt: daysAgo(2), closedAt: daysAgo(1) }))).toBeCloseTo(24);
-    expect(firstViewToClosureHours(fact("a", { firstViewAt: daysAgo(1), closedAt: daysAgo(2) }))).toBe("closeBeforeView");
-    expect(firstViewToClosureHours(fact("a", { firstViewAt: daysAgo(1), closedAt: daysAgo(1) }))).toBe(0);
-    expect(firstViewToClosureHours(fact("a", { firstViewAt: "garbage", closedAt: daysAgo(1) }))).toBe("closeBeforeView");
-  });
-});
-
-describe("durationResult", () => {
-  it("builds every planned series, counts exclusions (0 included) and sums clampedNegative", () => {
-    const plan: DurationPlan = {
-      seriesKeys: ["worked", "notWorked"],
-      exclusions: ["noRaise", "closeBeforeView"],
-      measure: raisedToClosedHours,
-    };
-    const result = durationResult(
-      [
-        { fact: fact("a", { raisedAt: daysAgo(1), closedAt: daysAgo(2) }), key: "worked" }, // −24 h → clamped
-        { fact: fact("b", { raisedAt: null }), key: "worked" },
-        { fact: fact("c", { raisedAt: null }), key: "notWorked" },
-        { fact: fact("d"), key: "notWorked" },
-        { fact: fact("e"), key: "all" }, // not in the plan → ignored
-      ],
-      plan,
-      METRICS_CONFIG,
-    );
-    expect(result.series.map((s) => [s.key, s.n])).toEqual([
-      ["worked", 1],
-      ["notWorked", 1],
-    ]);
-    expect(result.excluded).toEqual([
-      { reason: "noRaise", count: 2 },
-      { reason: "closeBeforeView", count: 0 },
-    ]);
-    expect(result.clampedNegative).toBe(1);
+  it("worked and not-worked populations at 7 d; worked only at 30 d", () => {
+    const total = deriveRaisedToClosed(raw({ facts, notWorked }), sel()).data.total;
+    expect(total.series.map((s) => [s.key, s.n])).toEqual([["worked", 1], ["notWorked", 1]]);
+    expect(total.series[0].median).toBe(24 + 0.5 * 24); // [24,48) bin, target 0.5 of 1
+    expect(total.excluded).toEqual([{ reason: "noRaise", count: 1 }]);
+    expect(deriveRaisedToClosed(raw({ facts }, 30), sel()).data.total.series.map((s) => s.key)).toEqual(["worked"]);
   });
 });
 
-describe("populations", () => {
-  const w7 = win(7);
-
-  it("closedInWindow keeps closed alerts with closedAt in the window", () => {
-    const rows = [
-      fact("in"),
-      fact("open", { isClosed: false }),
-      fact("old", { closedAt: daysAgo(10) }),
-      fact("none", { closedAt: null }),
+describe("deriveRaisedToFirstView (4.3)", () => {
+  it("population = first view in the window; no raise excluded and counted", () => {
+    const facts = [
+      fact("v1", { raisedAt: daysAgo(1), firstViewAt: daysAgo(0.5) }),
+      fact("v2", { raisedAt: null, firstViewAt: daysAgo(0.5) }),
+      fact("v3", { firstViewAt: daysAgo(10) }), // viewed before the window
     ];
-    expect(closedInWindow(rows, w7).map((f) => f.riskAlertId)).toEqual(["in"]);
+    const total = deriveRaisedToFirstView(raw({ facts }), sel()).data.total;
+    expect(total.series.map((s) => [s.key, s.n])).toEqual([["all", 1]]);
+    expect(total.excluded).toEqual([{ reason: "noRaise", count: 1 }]);
   });
+});
 
-  it("4.2 not-worked excludes touched ids, any human event, open now and out-of-window alerts (W5)", () => {
-    const notWorked = [
-      fact("n1", { worked: false }),
-      fact("t1", { worked: false }), // in L2 → excluded
-      fact("h1", { worked: true }), // human event ever → excluded
-      fact("o1", { worked: false, isClosed: false }), // open now → excluded
-      fact("x1", { worked: false, closedAt: daysAgo(20) }), // outside window
+describe("deriveFirstViewToClosure (4.4)", () => {
+  it("close before view excluded and counted; a tie is kept; unviewed not in the population", () => {
+    const facts = [
+      fact("k1", { firstViewAt: daysAgo(2), closedAt: daysAgo(1) }),
+      fact("tie", { firstViewAt: daysAgo(1), closedAt: daysAgo(1) }),
+      fact("cbv", { firstViewAt: daysAgo(0.5), closedAt: daysAgo(1) }),
+      fact("nv", { firstViewAt: null }),
     ];
-    expect(notWorkedClosed(notWorked, [fact("t1")], w7).map((f) => f.riskAlertId)).toEqual(["n1"]);
-  });
-
-  it("4.2 population tags worked and not-worked; null not-worked → worked only", () => {
-    // worked w1's only human event may precede the window: it is still worked (W4)
-    const facts = [fact("w1", { firstViewAt: daysAgo(30) }), fact("w2", { closedAt: daysAgo(9) })];
-    const pop = raisedToClosedPopulation(facts, [fact("n1", { worked: false })], w7);
-    expect(pop.map((a) => [a.fact.riskAlertId, a.key])).toEqual([
-      ["w1", "worked"],
-      ["n1", "notWorked"],
-    ]);
-    expect(raisedToClosedPopulation(facts, null, w7).map((a) => a.key)).toEqual(["worked"]);
-  });
-
-  it("4.3 population = first view in window", () => {
-    const facts = [fact("v", { firstViewAt: daysAgo(1) }), fact("old", { firstViewAt: daysAgo(8) }), fact("none")];
-    expect(raisedToFirstViewPopulation(facts, w7).map((a) => [a.fact.riskAlertId, a.key])).toEqual([["v", "all"]]);
-  });
-
-  it("4.4 population = closed in window and viewed", () => {
-    const facts = [fact("v", { firstViewAt: daysAgo(3) }), fact("nv"), fact("open", { isClosed: false, firstViewAt: daysAgo(3) })];
-    expect(firstViewToClosurePopulation(facts, w7).map((a) => [a.fact.riskAlertId, a.key])).toEqual([["v", "all"]]);
+    const out = deriveFirstViewToClosure(raw({ facts }), sel());
+    expect(out.data.total.series[0].n).toBe(2);
+    expect(out.data.total.excluded).toEqual([{ reason: "closeBeforeView", count: 1 }]);
+    expect(out.caveats).toContain("excludes-close-before-view");
   });
 });

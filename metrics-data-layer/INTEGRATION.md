@@ -35,7 +35,7 @@ Two more values are not in config:
   - **(a)** Replace the string `"@app/sdk"` with the real package name in those files.
   - **(b)** Keep the string and add an alias. The alias needs a tsconfig `paths` entry, `"@app/sdk": ["./node_modules/<real-sdk>"]` (or the package's entry file), plus the same alias in the host's Vite/Vitest `resolve.alias`.
 
-  `structure.test.ts` checks that only `source/osdk` imports `@app/sdk`. With (a), update the literal in that test too.
+  The `no-restricted-imports` rule in `eslint.config.mjs` checks that only `source/osdk` imports `@app/sdk`. With (a), update the literal in that rule too.
 - **The client import.** `source/osdk/defaultSource.ts` imports `{ client }` from `../../../../client`, which is `src/client.ts`. `source/batching.ts` imports `{ chunk }` from `../../../lib/osdk`, which is `src/lib/osdk.ts`. These are the host paths from instructions §3. Nothing changes if the host has them there.
 
 The host sets both config values by editing `config/metrics.ts`, which is what `INTEGRATION_UNBLOCKED_BY` says to do. Alternatively, it can pass a full `MetricsConfig` through `<MetricsSourceProvider config={...}>` or `loadCard(..., { config })`.
@@ -160,6 +160,7 @@ Run these against the live ontology before release.
    - `stubs/`
 
    Do not copy `package.json`, `tsconfig.json`, `vitest.config.ts`, `eslint.config.mjs`, `node_modules/` or `coverage/` either.
+   The structural rules (layering, OSDK boundary, size limits, no `any` / `console` / default exports / `withProperties`, pure `compute/`) live in `eslint.config.mjs`; merge its scoped rule blocks into the host's ESLint config to keep enforcing them.
 3. Point `@app/sdk` at the real SDK, as described in section 1 (rename the import or add an alias). Remove the standalone `paths` entry for `stubs/app-sdk`.
 4. Fill in `ALERT_APP_ID` and `VERDICT_DATE_PROPERTY` in `src/config/metrics.ts`. Settle `VERDICT_ID_LOOKUP`.
 5. **Wiring.** No wiring is required. Without a provider, the hooks use `getDefaultOsdkSource()`, which is `createOsdkSource({ client, sdk })` over `src/client.ts` and `@app/sdk`. To inject a source, put the provider above the Metrics page:
